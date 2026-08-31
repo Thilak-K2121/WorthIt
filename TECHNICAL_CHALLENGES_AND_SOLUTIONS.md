@@ -206,6 +206,72 @@ When users navigate directly to sub-routes (e.g. `https://worthit-9xz8.onrender.
 
 ---
 
+### 10. Python Tuple Truthiness Bug in Catalog Deduplication Engine
+
+#### 🔴 The Problem & Symptom
+When executing the 100-smartphone ingestion script (`seed_famous_smartphones.py`), the log reported:
+```text
+[*] Starting ingestion of 92 famous smartphones into the database...
+[+] Successfully seeded 0 smartphones into the database!
+[-] Skipped 92 existing devices.
+```
+Even on an empty database, every single device was erroneously skipped as an "existing duplicate."
+
+#### 🔍 Root Cause Analysis
+- `DeduplicationService.find_existing_duplicate()` returns a 2-tuple: `Tuple[Optional[Product], float]`, representing `(matched_product, confidence_score)`.
+- When no match was found, it returned `(None, 0.0)`.
+- In Python, **any 2-element tuple is truthy** regardless of the elements inside (`bool((None, 0.0)) == True`).
+- The caller evaluated `existing = find_existing_duplicate(...)` followed by `if existing:`, which always evaluated to `True`, falsely claiming every phone was a duplicate.
+
+#### 💡 The Engineering Solution
+1. **Explicit Tuple Unpacking:** Refactored the call to unpack both return variables:
+   ```python
+   existing, confidence = DeduplicationService.find_existing_duplicate(db, brand, model_name)
+   if existing is not None:
+       skipped_count += 1
+       continue
+   ```
+2. **Result:** All 98 smartphones across 17 brands were immediately and accurately ingested into Supabase.
+
+---
+
+### 11. Paginated API Query Slicing in Dynamic Form Pre-Selection (`/submit?brand=Vivo`)
+
+#### 🔴 The Problem & Browser Symptom
+Navigating to `/submit?brand=Vivo` displayed an infinite "Loading catalog..." message or failed to pre-select any Vivo models in the device dropdown.
+
+#### 🔍 Root Cause Analysis
+- The backend catalog endpoint enforces pagination (`limit=50`).
+- Because brands were sorted alphabetically or by popularity, the first page slice contained Apple, Google, and Samsung models.
+- Vivo models were on subsequent pages and therefore missing from the client's initial 50-item cache.
+- The client-side filter `products.filter(p => p.brand === 'Vivo')` returned an empty array `[]`, causing the pre-selection logic to stall.
+
+#### 💡 The Engineering Solution
+1. **Brand-Aware Parallel Querying:** Updated `SubmitExperiencePage.jsx` so that when a `requestedBrand` parameter exists, it triggers a targeted query `api.getProducts({ brand: requestedBrand, page_size: 50 })` alongside the default list.
+2. **Deep Pre-Selection Hook:** Enhanced `OwnershipForm.jsx` to bind `requestedProductId` and `requestedBrand` immediately upon component mount, auto-selecting the brand's flagship device without waiting for manual user interaction.
+
+---
+
+### 12. Persistent Browser Tab Favicon Caching on Production Static Builds
+
+#### 🔴 The Problem & Browser Symptom
+After generating and deploying a custom SVG brand icon (`favicon.svg`) with the WorthIt mint shield, Chrome, Edge, and Safari continued displaying the generic default globe icon in the tab header.
+
+#### 🔍 Root Cause Analysis
+- Modern browsers cache `favicon.ico` and `/favicon.svg` aggressively in disk caches, often ignoring HTTP cache headers or deployment updates.
+- The HTML declaration `<link rel="icon" href="/favicon.svg" />` lacked cache-busting identifiers and alternative relation types (`shortcut icon`, `apple-touch-icon`).
+
+#### 💡 The Engineering Solution
+1. **Versioned Cache Busting:** Appended query version tags to all icon links in `index.html`:
+   ```html
+   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+   <link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+   <link rel="apple-touch-icon" href="/favicon.svg?v=2" />
+   ```
+2. **Result:** Browsers immediately treat the icon as a fresh asset, rendering the custom mint shield icon across all active tabs upon page load.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -218,6 +284,9 @@ When users navigate directly to sub-routes (e.g. `https://worthit-9xz8.onrender.
 | **Cloud DB Network Unreachable** | Render IPv4 trying to connect to Supabase direct IPv6 address | Migrated connection string to Supabase IPv4 Pooler (`aws-0-[region].pooler.supabase.com:6543`) | Cloud platforms often lack IPv6; always use connection pooler IPv4 endpoints for managed databases. |
 | **Blank Screen on Static CDN** | Relative asset paths & silent React crashes | Added `base: '/'`, `_redirects`, and top-level `ErrorBoundary` | Always enforce root base paths and top-level error boundaries for production SPAs. |
 | **Sub-Route 404 on Refresh** | Static web server looking for physical directories | Configured Render Static Site Rewrite rule (`/*` $\rightarrow$ `/index.html`) | SPAs require server-side rewrite rules to route all sub-paths to the entry index.html. |
+| **Tuple Truthiness Bug** | Python 2-tuple `(None, 0.0)` evaluating to `True` in boolean check | Unpacked tuple explicitly and verified `if existing is not None:` | Be mindful of Python tuple truthiness when returning status-confidence pairs. |
+| **Paginated Form Pre-Selection** | Target brand items excluded from initial paginated slice | Implemented brand-targeted parallel fetching in `SubmitExperiencePage` | Combine generic and targeted queries when pre-selecting items from large paginated datasets. |
+| **Favicon Tab Cache Stagnation** | Chrome/Edge aggressively caching disk favicons | Added version query params (`?v=2`) and multi-rel icon tags | Use versioned asset URLs to force instant client cache invalidation on static deploys. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
@@ -226,6 +295,8 @@ When users navigate directly to sub-routes (e.g. `https://worthit-9xz8.onrender.
 - ✅ **Backend:** FastAPI + SQLAlchemy 2.0 + SQLite/Supabase PostgreSQL with **11/11 tests passing (`pytest`)**.
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
 - ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 17-brand catalog directory with 98 famous smartphones, 3-step review wizard, and side-by-side comparison engine.
+- ✅ **Deployment:** Fully deployed on **Render Web Services + Render Static Site + Supabase PostgreSQL** with automated boot seeding.
+
 
 
 
