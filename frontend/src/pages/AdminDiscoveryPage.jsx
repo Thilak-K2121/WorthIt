@@ -12,7 +12,6 @@ export default function AdminDiscoveryPage() {
   const [productsCount, setProductsCount] = useState(0);
   const [running, setRunning] = useState(false);
   const [queryTopic, setQueryTopic] = useState('Latest Smartphone Launches 2026');
-  const [forceMock, setForceMock] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('runs');
   const [expandedRunId, setExpandedRunId] = useState(null);
@@ -47,8 +46,7 @@ export default function AdminDiscoveryPage() {
     try {
       const newRun = await api.triggerDiscovery({
         query_topic: queryTopic,
-        max_results: 5,
-        force_mock: forceMock
+        max_results: 5
       });
       await refreshData();
       if (newRun?.id) {
@@ -140,15 +138,10 @@ export default function AdminDiscoveryPage() {
             <Sparkles className="w-4 h-4 text-[#00D09C]" />
             Trigger Automated Web Discovery
           </h3>
-          <label className="flex items-center gap-2 text-xs text-slate-500 font-semibold cursor-pointer">
-            <input
-              type="checkbox"
-              checked={forceMock}
-              onChange={(e) => setForceMock(e.target.checked)}
-              className="rounded accent-[#00D09C]"
-            />
-            <span>Offline Mock Mode</span>
-          </label>
+          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Live AI Search & Extraction
+          </span>
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3">
