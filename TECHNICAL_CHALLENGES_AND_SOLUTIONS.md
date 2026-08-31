@@ -326,6 +326,24 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 
 ---
 
+### 14. Uncontrolled URL-Binding Keystroke Hijacking & Filter State Desynchronization
+
+#### 🔴 The Problem & Browser Symptoms
+1. **Search Focus Loss on 1st Keystroke:** When typing into the search bar (e.g. attempting to type `"apple"`), typing a single letter `'a'` instantly triggered navigation to `/products?search=a`, swapping out the view and unmounting the search input, causing immediate loss of keyboard focus.
+2. **Broken "Back to All Brands" Button:** Clicking the "Back to All Brands" button failed to return the user to the brand catalog when in a search results state.
+
+#### 🔍 Root Cause Analysis
+- **Synchronous URL Search Mutation:** `handleSearchChange` invoked `setSearchParams({ search: val })` synchronously on raw `onChange` events without debouncing or local component buffering.
+- **Conditional Root View Desync:** The component toggled views via `{!selectedBrand && !search ? <BrandDirectory /> : <SearchResults />}`. On the very first keystroke, `search` became truthy, abruptly unmounting `<BrandDirectory />` and the active `<input />` element.
+- **Asymmetric Filter Removal:** `handleSelectBrand('')` only executed `newParams.delete('brand')`. When users performed a search, `search=...` remained in the query string, keeping the condition `!selectedBrand && !search` `false`, rendering the button non-functional.
+
+#### 💡 The Engineering Solution
+1. **Local State Buffering & Form Submission:** Decoupled keyboard input typing from URL parameter mutation. Introduced a local `searchInput` state with an explicit `<form onSubmit={handleSearchSubmit}>` (Enter key or dedicated Search button) and a clear ("✕") button.
+2. **Persistent Search Form in Both Views:** Added the responsive search form to both the Brand Directory and Search Results views, guaranteeing the user never loses input focus.
+3. **Comprehensive Filter Reset:** Implemented `handleClearAllFilters()` which explicitly clears both `brand` and `search` URL parameters while resetting `searchInput = ''`, guaranteeing reliable 1-click return to the 17-brand grid.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -342,6 +360,7 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 | **Paginated Form Pre-Selection** | Target brand items excluded from initial paginated slice | Implemented brand-targeted parallel fetching in `SubmitExperiencePage` | Combine generic and targeted queries when pre-selecting items from large paginated datasets. |
 | **Favicon Tab Cache Stagnation** | Chrome/Edge aggressively caching disk favicons | Added version query params (`?v=2`) and multi-rel icon tags | Use versioned asset URLs to force instant client cache invalidation on static deploys. |
 | **N+1 SQL Latency Explosion** | 300+ remote SQL queries per page request in loop | Replaced loop queries with 2 bulk `GROUP BY` aggregations + `joinedload` | Prevent N+1 queries by aggregating multi-model metrics in single batch queries (~1,500x speedup). |
+| **Keystroke Hijacking & Desync** | Direct `onChange` mutating URL search params without input buffering | Buffered search state locally with form submit handler & clean filter reset | Buffer user text input in component state before committing changes to route search params. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
@@ -351,7 +370,8 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
 - ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 17-brand catalog directory with 98 famous smartphones, 3-step review wizard, and side-by-side comparison engine.
 - ✅ **Deployment:** Fully deployed on **Render Web Services + Render Static Site + Supabase PostgreSQL** with automated boot seeding.
-- ✅ **Performance:** Catalog query response latency reduced from **60,000ms to 40ms**.
+- ✅ **Performance & UX:** Search typing without focus interruption, 1-click filter resets, and **40ms catalog load speeds**.
+
 
 
 

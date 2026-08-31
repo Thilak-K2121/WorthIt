@@ -177,14 +177,20 @@ export default function ProductListPage() {
   const [loading, setLoading] = useState(true);
 
   const selectedBrand = searchParams.get('brand') || '';
-  const search = searchParams.get('search') || '';
+  const searchParam = searchParams.get('search') || '';
+  const [searchInput, setSearchInput] = useState(searchParam);
+
+  // Sync searchInput when URL parameter changes (e.g. browser back/forward)
+  useEffect(() => {
+    setSearchInput(searchParam);
+  }, [searchParam]);
 
   useEffect(() => {
     async function fetchCatalog() {
       setLoading(true);
       try {
         const res = await api.getProducts({
-          search: search || undefined,
+          search: searchParam || undefined,
           brand: selectedBrand || undefined,
           page_size: 50
         });
@@ -196,7 +202,7 @@ export default function ProductListPage() {
       }
     }
     fetchCatalog();
-  }, [selectedBrand, search]);
+  }, [selectedBrand, searchParam]);
 
   const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
   const allBrands = [
@@ -222,20 +228,27 @@ export default function ProductListPage() {
   };
 
   const handleSelectBrand = (brandName) => {
-    const newParams = new URLSearchParams(searchParams);
+    const newParams = new URLSearchParams();
     if (brandName) {
       newParams.set('brand', brandName);
-    } else {
-      newParams.delete('brand');
     }
     setSearchParams(newParams);
   };
 
-  const handleSearchChange = (e) => {
-    const val = e.target.value;
+  const handleClearAllFilters = () => {
+    setSearchInput('');
+    setSearchParams({});
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
     const newParams = new URLSearchParams(searchParams);
-    if (val) newParams.set('search', val);
-    else newParams.delete('search');
+    const query = searchInput.trim();
+    if (query) {
+      newParams.set('search', query);
+    } else {
+      newParams.delete('search');
+    }
     setSearchParams(newParams);
   };
 
@@ -245,7 +258,7 @@ export default function ProductListPage() {
   return (
     <div className="space-y-12 py-8 max-w-6xl mx-auto">
       {/* 1. CONDITIONAL VIEW: All Brands Directory (Default) */}
-      {!selectedBrand && !search ? (
+      {!selectedBrand && !searchParam ? (
         <div className="space-y-10">
           {/* Hero Header with Pop-In */}
           <div className="text-center max-w-3xl mx-auto space-y-4">
@@ -262,18 +275,35 @@ export default function ProductListPage() {
             </div>
           </div>
 
-          {/* Search bar */}
+          {/* Search bar with explicit Search button & Enter key support */}
           <div className="max-w-2xl mx-auto hero-animate-cards">
-            <div className="relative flex items-center">
-              <Search className="w-5 h-5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search any model (e.g. S24 Ultra, Pixel 8 Pro, iPhone 15, Edge 50 Ultra, Vivo X100)..."
-                value={search}
-                onChange={handleSearchChange}
-                className="w-full pl-14 pr-5 py-4 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-900 text-sm focus:outline-none focus:border-[#00D09C] transition-all"
-              />
-            </div>
+            <form onSubmit={handleSearchSubmit} className="relative flex items-center gap-2">
+              <div className="relative flex-grow">
+                <Search className="w-5 h-5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search any phone (e.g. Apple, S24 Ultra, Pixel 8, Vivo X100, Nord 4)..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-14 pr-10 py-4 rounded-2xl bg-white border border-slate-200 shadow-sm text-slate-900 text-sm focus:outline-none focus:border-[#00D09C] transition-all"
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); handleClearAllFilters(); }}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-sm p-1"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="px-6 py-4 rounded-2xl bg-[#00D09C] hover:bg-[#00b88a] text-white font-bold text-sm shadow-mint hover:shadow-mint-hover transition-all shrink-0"
+              >
+                Search
+              </button>
+            </form>
           </div>
 
           {/* Brand Cards Grid covering all major global & Indian brands */}
@@ -332,20 +362,49 @@ export default function ProductListPage() {
           </div>
         </div>
       ) : (
-        /* 2. CONDITIONAL VIEW: Brand Spotlight & Devices Lineup */
+        /* 2. CONDITIONAL VIEW: Brand Spotlight & Devices Lineup / Search Results */
         <div className="space-y-8 animate-fade-in-up">
-          {/* Back Navigation Bar */}
-          <div className="flex items-center justify-between">
+          {/* Back Navigation Bar & Persistent Search Input */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <button
-              onClick={() => handleSelectBrand('')}
-              className="inline-flex items-center gap-2 text-xs font-extrabold text-slate-600 hover:text-emerald-700 transition-colors px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200"
+              onClick={handleClearAllFilters}
+              className="inline-flex items-center justify-center gap-2 text-xs font-extrabold text-slate-700 hover:text-slate-900 transition-colors px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 shrink-0 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to All Brands</span>
             </button>
 
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-              {selectedBrand ? `${selectedBrand} Lineup` : `Search Results`} ({products.length} devices)
+            {/* Inline search bar in results view */}
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-grow max-w-md">
+              <div className="relative flex-grow">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search another model..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#00D09C]"
+                />
+                {searchInput && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearchInput(''); handleClearAllFilters(); }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-0.5"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="px-4 py-2 rounded-xl bg-[#00D09C] hover:bg-[#00b88a] text-white font-bold text-xs shrink-0 shadow-sm cursor-pointer"
+              >
+                Search
+              </button>
+            </form>
+
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-center shrink-0">
+              {selectedBrand ? `${selectedBrand} Lineup` : `Search: "${searchParam}"`} ({products.length} devices)
             </span>
           </div>
 
