@@ -148,6 +148,29 @@ Combined with `@keyframes heroFadeInUp` in `index.css`, this guarantees smooth, 
 
 ---
 
+### 7. Cloud PostgreSQL IPv6 vs IPv4 Network Unreachable (`psycopg2.OperationalError`)
+
+#### 🔴 The Problem & Terminal Log
+When deploying the containerized FastAPI backend on Render with a direct Supabase connection:
+```text
+psycopg2.OperationalError: connection to server at "db.ruksainsfxgcyxmmvrve.supabase.co" (2406:da12:1f1:f800:5cd7:217c:ff31:39ee), port 5432 failed: Network is unreachable
+Is the server running on that host and accepting TCP/IP connections?
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) ...
+ERROR: Application startup failed. Exiting.
+```
+
+#### 🔍 Root Cause Analysis
+- Supabase's direct connection domain (`db.[project-ref].supabase.co:5432`) resolves to an **IPv6 address**.
+- Cloud hosting providers like Render Free Tier instances operate on **IPv4-only networking stacks** without native outbound IPv6 routes.
+- When `psycopg2` attempted a TCP handshake with the IPv6 socket address `2406:da12:...`, the Linux kernel failed with `ENETUNREACH` (*Network is unreachable*).
+
+#### 💡 The Engineering Solution
+1. **Supabase Connection Pooler (IPv4 Gateway):** Switched the connection string from the direct IPv6 host to Supabase's dedicated **Session Pooler** (`aws-0-[region].pooler.supabase.com` on port `6543` / `5432`).
+   - Format: `postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres`
+2. **PostgreSQL Connection Resiliency:** Added `pool_pre_ping=True` and scheme normalization in SQLAlchemy engine initialization to gracefully handle connection drops in serverless poolers.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -157,11 +180,13 @@ Combined with `@keyframes heroFadeInUp` in `index.css`, this guarantees smooth, 
 | **Pydantic Type Variance (500)** | `Dict[str, int]` rejecting string values in nested dictionaries | Refactored schema to `Dict[str, Any]` and added edge-case testing | Type annotations in Pydantic validate all dictionary values, not just keys. |
 | **Missing Schema Fields (422)** | UI wizard refactor omitted required date field | Made field optional with service-level default to `purchase_date` | Coordinate frontend payloads and backend schema defaults closely during UI refactors. |
 | **Error Rendering `[object Object]`** | JavaScript throwing raw JSON error arrays | Parsed FastAPI validation error lists into human-readable strings | Always sanitize and unpack API error payloads before displaying to users. |
+| **Cloud DB Network Unreachable** | Render IPv4 trying to connect to Supabase direct IPv6 address | Migrated connection string to Supabase IPv4 Pooler (`aws-0-[region].pooler.supabase.com:6543`) | Cloud platforms often lack IPv6; always use connection pooler IPv4 endpoints for managed databases. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
 
 ## 🏆 Current Project Status
-- ✅ **Backend:** FastAPI + SQLAlchemy 2.0 + SQLite/PostgreSQL with **11/11 tests passing (`pytest`)**.
+- ✅ **Backend:** FastAPI + SQLAlchemy 2.0 + SQLite/Supabase PostgreSQL with **11/11 tests passing (`pytest`)**.
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
 - ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 16-brand catalog directory, 3-step review wizard, and side-by-side comparison engine.
+

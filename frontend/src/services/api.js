@@ -1,4 +1,4 @@
-const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const RAW_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://worthit-backend-v4ob.onrender.com/api/v1';
 const API_BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
 
 async function fetchJson(url, options = {}) {
