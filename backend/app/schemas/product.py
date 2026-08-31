@@ -1,0 +1,76 @@
+from typing import List, Optional
+from datetime import date, datetime
+from decimal import Decimal
+from pydantic import BaseModel, ConfigDict, Field
+
+class ProductVariantBase(BaseModel):
+    ram: Optional[str] = Field(None, example="12GB")
+    storage: Optional[str] = Field(None, example="256GB")
+    chipset: Optional[str] = Field(None, example="Snapdragon 8 Gen 3")
+    launch_price: Optional[Decimal] = Field(None, example=59999.00)
+    currency: Optional[str] = "INR"
+
+class ProductVariantCreate(ProductVariantBase):
+    pass
+
+class ProductVariantResponse(ProductVariantBase):
+    id: str
+    product_id: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductBase(BaseModel):
+    brand: str = Field(..., example="Samsung")
+    model_name: str = Field(..., example="Galaxy S24 Ultra")
+    official_name: Optional[str] = None
+    release_date: Optional[date] = None
+    country_market: Optional[str] = "Global"
+    official_url: Optional[str] = None
+    status: str = "ACTIVE"
+    discovery_source: str = "MANUAL"
+    verification_status: str = "VERIFIED"
+    description: Optional[str] = None
+
+class ProductCreate(ProductBase):
+    variants: Optional[List[ProductVariantCreate]] = None
+
+class ProductUpdate(BaseModel):
+    official_name: Optional[str] = None
+    release_date: Optional[date] = None
+    country_market: Optional[str] = None
+    official_url: Optional[str] = None
+    status: Optional[str] = None
+    verification_status: Optional[str] = None
+    description: Optional[str] = None
+
+class ProductSourceResponse(BaseModel):
+    id: str
+    source_url: str
+    source_title: Optional[str] = None
+    source_snippet: Optional[str] = None
+    provider: str
+    discovered_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductSummaryResponse(ProductBase):
+    id: str
+    normalized_name: str
+    created_at: datetime
+    updated_at: datetime
+    variant_count: int = 0
+    total_owners_count: int = 0
+    long_term_owners_count: int = 0 # 12+ months
+    avg_overall_satisfaction: Optional[float] = None
+    would_buy_again_percentage: Optional[float] = None
+    model_config = ConfigDict(from_attributes=True)
+
+class ProductDetailResponse(ProductBase):
+    id: str
+    normalized_name: str
+    created_at: datetime
+    updated_at: datetime
+    variants: List[ProductVariantResponse] = []
+    sources: List[ProductSourceResponse] = []
+    total_owners_count: int = 0
+    long_term_owners_count: int = 0
+    model_config = ConfigDict(from_attributes=True)

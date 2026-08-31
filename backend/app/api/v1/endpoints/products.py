@@ -1,0 +1,90 @@
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.schemas.product import (
+    ProductCreate,
+    ProductUpdate,
+    ProductDetailResponse,
+    ProductSummaryResponse,
+    ProductVariantResponse
+)
+from app.schemas.common import PaginatedResponse
+from app.services.product_service import ProductService
+
+router = APIRouter()
+
+@router.get("", response_model=PaginatedResponse[ProductSummaryResponse])
+def list_products(
+    db: Session = Depends(get_db),
+    search: Optional[str] = Query(None, description="Search by brand, model or normalized name"),
+    brand: Optional[str] = Query(None, description="Filter by brand (e.g. Samsung, Apple, Google)"),
+    status: Optional[str] = Query("ACTIVE", description="Product status filter"),
+    sort_by: str = Query("popularity", description="Sort by: popularity, satisfaction, release_date, long_term_owners"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100)
+):
+    skip = (page - 1) * page_size
+    items, total = ProductService.list_products(
+        db=db,
+        search=search,
+        brand=brand,
+        status=status,
+        skip=skip,
+        limit=page_size,
+        sort_by=sort_by
+    )
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 1
+    return PaginatedResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+@router.get("/{product_id}", response_model=ProductDetailResponse)
+def get_product(
+    product_id: str,
+    db: Session = Depends(get_db)
+):
+    product = ProductService.get_by_id(db, product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    
+    # Calculate owner counts
+    total_owners = len(product.ownerships)
+    long_term_owners = sum(
+        1 for o in product.ownerships
+        for r in o.reports
+        if r.ownership_duration_months >= 12
+    )
+
+    return ProductDetailResponse(
+        id=product.id,
+        brand=product.brand,
+        model_name=product.model_name,
+        normalized_name=product.normalized_name,
+        official_name=product.official_name,
+        release_date=product.release_date,
+        country_market=product.country_market,
+        official_url=product.official_url,
+        status=product.status,
+        discovery_source=product.discovery_source,
+        verification_status=product.verification_status,
+        description=product.description,
+        created_at=product.created_at,
+        updated_at=product.updated_at,
+        variants=product.variants,
+        sources=product.sources,
+        total_owners_count=total_owners,
+        long_term_owners_count=long_term_owners
+    )
+
+@router.post("", response_model=ProductDetailResponse, status_code=201)
+def create_product(
+    product_in: ProductCreate,
+    db: Session = Depends(get_db)
+):
+    created = ProductService.create_product(db, product_in)
+    return ProductService.get_by_id(db, created.id)

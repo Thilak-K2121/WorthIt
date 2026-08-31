@@ -1,0 +1,43 @@
+import httpx
+from typing import List
+from app.providers.base import DiscoveryProvider, DiscoverySearchResult
+from app.core.config import settings
+from app.core.logging import logger
+
+class TavilyProvider(DiscoveryProvider):
+    def __init__(self, api_key: str = ""):
+        self.api_key = api_key or settings.TAVILY_API_KEY
+        self.base_url = "https://api.tavily.com/search"
+
+    async def search_smartphone_launches(self, query: str, max_results: int = 5) -> List[DiscoverySearchResult]:
+        if not self.api_key:
+            logger.warning("No Tavily API key provided. Falling back to mock provider.")
+            from app.providers.mock_providers import MockTavilyProvider
+            return await MockTavilyProvider().search_smartphone_launches(query, max_results)
+
+        payload = {
+            "api_key": self.api_key,
+            "query": f"{query} smartphone launch specs announcement",
+            "search_depth": "advanced",
+            "include_domains": ["gsmarena.com", "theverge.com", "gadgets360.com", "androidcentral.com", "9to5google.com", "xda-developers.com"],
+            "max_results": max_results
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(self.base_url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+
+                results: List[DiscoverySearchResult] = []
+                for item in data.get("results", []):
+                    results.append(DiscoverySearchResult(
+                        url=item.get("url", ""),
+                        title=item.get("title", ""),
+                        snippet=item.get("content", ""),
+                        raw_data=item
+                    ))
+                return results
+        except Exception as e:
+            logger.error(f"Tavily search failed: {e}. Returning empty results.")
+            return []
