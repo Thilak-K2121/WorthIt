@@ -187,6 +187,25 @@ When deploying the React + Vite frontend to static CDN hosting (Render Static Si
 
 ---
 
+### 9. Render Static Site SPA Routing & 404 on Sub-Routes (`GET /products 404`)
+
+#### 🔴 The Problem & Browser Symptom
+When users navigate directly to sub-routes (e.g. `https://worthit-9xz8.onrender.com/products` or `/compare`) or refresh the page, the browser encounters `404 Not Found`.
+
+#### 🔍 Root Cause Analysis
+- On static web servers, requesting `/products` looks for a literal file or directory `products/index.html` on the server disk.
+- In a React Single-Page Application (SPA), all routing is handled dynamically in the client via JavaScript and HTML5 History API (`react-router-dom`).
+- Without an explicit CDN fallback rule, edge servers return HTTP 404 for any path other than the root `/`.
+
+#### 💡 The Engineering Solution
+1. **Render Dashboard Rewrite Rule:** Added an edge rewrite rule in Render Static Site configuration:
+   - **Type:** `Rewrite`
+   - **Source:** `/*`
+   - **Destination:** `/index.html`
+2. **`_redirects` File Bundling:** Ensured `frontend/public/_redirects` contains `/* /index.html 200`, automatically bundled into `dist/` during `npm run build`.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -198,6 +217,7 @@ When deploying the React + Vite frontend to static CDN hosting (Render Static Si
 | **Error Rendering `[object Object]`** | JavaScript throwing raw JSON error arrays | Parsed FastAPI validation error lists into human-readable strings | Always sanitize and unpack API error payloads before displaying to users. |
 | **Cloud DB Network Unreachable** | Render IPv4 trying to connect to Supabase direct IPv6 address | Migrated connection string to Supabase IPv4 Pooler (`aws-0-[region].pooler.supabase.com:6543`) | Cloud platforms often lack IPv6; always use connection pooler IPv4 endpoints for managed databases. |
 | **Blank Screen on Static CDN** | Relative asset paths & silent React crashes | Added `base: '/'`, `_redirects`, and top-level `ErrorBoundary` | Always enforce root base paths and top-level error boundaries for production SPAs. |
+| **Sub-Route 404 on Refresh** | Static web server looking for physical directories | Configured Render Static Site Rewrite rule (`/*` $\rightarrow$ `/index.html`) | SPAs require server-side rewrite rules to route all sub-paths to the entry index.html. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
@@ -205,6 +225,7 @@ When deploying the React + Vite frontend to static CDN hosting (Render Static Si
 ## 🏆 Current Project Status
 - ✅ **Backend:** FastAPI + SQLAlchemy 2.0 + SQLite/Supabase PostgreSQL with **11/11 tests passing (`pytest`)**.
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
-- ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 16-brand catalog directory, 3-step review wizard, and side-by-side comparison engine.
+- ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 17-brand catalog directory with 98 famous smartphones, 3-step review wizard, and side-by-side comparison engine.
+
 
 
