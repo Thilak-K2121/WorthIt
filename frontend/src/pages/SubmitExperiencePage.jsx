@@ -18,8 +18,19 @@ export default function SubmitExperiencePage() {
   useEffect(() => {
     async function loadProducts() {
       try {
-        const res = await api.getProducts({ page_size: 100 });
-        setProducts(res.items || []);
+        const res = await api.getProducts({ page_size: 50 });
+        let allItems = res.items || [];
+        if (requestedBrand && !allItems.some(p => p.brand.toLowerCase() === requestedBrand.toLowerCase())) {
+          try {
+            const brandRes = await api.getProducts({ brand: requestedBrand, page_size: 50 });
+            if (brandRes?.items?.length) {
+              allItems = [...brandRes.items, ...allItems];
+            }
+          } catch (e) {
+            console.warn('Brand specific load failed:', e);
+          }
+        }
+        setProducts(allItems);
       } catch (err) {
         console.error('Failed to load products for submission:', err);
       } finally {
@@ -27,7 +38,7 @@ export default function SubmitExperiencePage() {
       }
     }
     loadProducts();
-  }, []);
+  }, [requestedBrand]);
 
   const handleSubmit = async (payload) => {
     setSubmitting(true);

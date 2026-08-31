@@ -5,12 +5,12 @@ import {
   HelpCircle, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Camera, ShieldCheck
 } from 'lucide-react';
 
-export default function OwnershipForm({ products, onSubmit, isSubmitting, requestedBrand }) {
+export default function OwnershipForm({ products, onSubmit, isSubmitting, requestedBrand, requestedProductId }) {
   const [step, setStep] = useState(1);
 
   // Form State
   const [formData, setFormData] = useState({
-    product_id: '',
+    product_id: requestedProductId || '',
     purchase_price: '',
     ownership_duration_months: 12,
     overall_satisfaction: '4.5',
@@ -28,14 +28,16 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
     : [];
 
   useEffect(() => {
-    if (products && products.length > 0 && !formData.product_id) {
+    if (requestedProductId) {
+      setFormData(prev => ({ ...prev, product_id: requestedProductId }));
+    } else if (products && products.length > 0 && !formData.product_id) {
       if (matchingBrandProducts.length > 0) {
         setFormData(prev => ({ ...prev, product_id: matchingBrandProducts[0].id }));
       } else {
         setFormData(prev => ({ ...prev, product_id: products[0].id }));
       }
     }
-  }, [products, requestedBrand]);
+  }, [products, requestedBrand, requestedProductId]);
 
   const handleNext = () => setStep(prev => Math.min(prev + 1, 3));
   const handleBack = () => setStep(prev => Math.max(prev - 1, 1));
