@@ -171,6 +171,22 @@ ERROR: Application startup failed. Exiting.
 
 ---
 
+### 8. Static Site CDN Path Resolution & Client Runtime Error Boundaries
+
+#### 🔴 The Problem & Browser Symptom
+When deploying the React + Vite frontend to static CDN hosting (Render Static Sites), navigating to the domain initially rendered a blank white page without visible console explanation.
+
+#### 🔍 Root Cause Analysis
+- **Relative Asset Resolution:** Vite defaults to relative base paths (`./`) in certain bundler setups, causing sub-route deep links (e.g. `/products/123`) to look for `/products/assets/...` instead of the root `/assets/...` directory.
+- **Silent React Unmount:** Uncaught client-side runtime errors during initial mount caused React's virtual DOM tree to unmount completely, leaving a blank `root` div without visual error diagnostics for users.
+
+#### 💡 The Engineering Solution
+1. **Explicit Root Base Configuration:** Configured `base: '/'` in `frontend/vite.config.js` to enforce absolute asset resolution across all nested routes.
+2. **Global Production `ErrorBoundary`:** Wrapped the top-level `<App />` component in a custom `ErrorBoundary` in `main.jsx` with an interactive crash recovery UI and reload action.
+3. **Single Page Application (SPA) Rewrites:** Added `_redirects` (`/* /index.html 200`) to guarantee client-side route handling on any static edge CDN.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -181,6 +197,7 @@ ERROR: Application startup failed. Exiting.
 | **Missing Schema Fields (422)** | UI wizard refactor omitted required date field | Made field optional with service-level default to `purchase_date` | Coordinate frontend payloads and backend schema defaults closely during UI refactors. |
 | **Error Rendering `[object Object]`** | JavaScript throwing raw JSON error arrays | Parsed FastAPI validation error lists into human-readable strings | Always sanitize and unpack API error payloads before displaying to users. |
 | **Cloud DB Network Unreachable** | Render IPv4 trying to connect to Supabase direct IPv6 address | Migrated connection string to Supabase IPv4 Pooler (`aws-0-[region].pooler.supabase.com:6543`) | Cloud platforms often lack IPv6; always use connection pooler IPv4 endpoints for managed databases. |
+| **Blank Screen on Static CDN** | Relative asset paths & silent React crashes | Added `base: '/'`, `_redirects`, and top-level `ErrorBoundary` | Always enforce root base paths and top-level error boundaries for production SPAs. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
@@ -189,4 +206,5 @@ ERROR: Application startup failed. Exiting.
 - ✅ **Backend:** FastAPI + SQLAlchemy 2.0 + SQLite/Supabase PostgreSQL with **11/11 tests passing (`pytest`)**.
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
 - ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 16-brand catalog directory, 3-step review wizard, and side-by-side comparison engine.
+
 
