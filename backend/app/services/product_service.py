@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, case
 from app.models.product import Product, ProductVariant
 from app.models.ownership import Ownership
 from app.models.experience import ExperienceReport
@@ -47,43 +47,52 @@ class ProductService:
             )
 
         total = query.count()
-        products = query.offset(skip).limit(limit).all()
+        products = query.options(joinedload(Product.variants)).offset(skip).limit(limit).all()
+
+        product_ids = [p.id for p in products]
+
+        # 1. Bulk aggregation of ownership count
+        ownership_map = {}
+        if product_ids:
+            for pid, count in (
+                db.query(Ownership.product_id, func.count(Ownership.id))
+                .filter(Ownership.product_id.in_(product_ids))
+                .group_by(Ownership.product_id)
+                .all()
+            ):
+                ownership_map[pid] = count
+
+        # 2. Bulk aggregation of experience reports metrics
+        exp_map = {}
+        if product_ids:
+            for pid, lt_count, avg_sat, total_wba, yes_wba in (
+                db.query(
+                    Ownership.product_id,
+                    func.sum(case((ExperienceReport.ownership_duration_months >= 12, 1), else_=0)),
+                    func.avg(ExperienceReport.overall_satisfaction),
+                    func.count(ExperienceReport.id),
+                    func.sum(case((ExperienceReport.would_buy_again == "YES", 1), else_=0))
+                )
+                .join(ExperienceReport, ExperienceReport.ownership_id == Ownership.id)
+                .filter(Ownership.product_id.in_(product_ids))
+                .group_by(Ownership.product_id)
+                .all()
+            ):
+                exp_map[pid] = {
+                    "long_term_count": int(lt_count or 0),
+                    "avg_sat": float(avg_sat) if avg_sat is not None else None,
+                    "total_wba": int(total_wba or 0),
+                    "yes_wba": int(yes_wba or 0)
+                }
 
         summaries: List[ProductSummaryResponse] = []
         for p in products:
-            # Query stats
-            owners_count = db.query(Ownership).filter(Ownership.product_id == p.id).count()
+            owners_count = ownership_map.get(p.id, 0)
+            stats = exp_map.get(p.id, {"long_term_count": 0, "avg_sat": None, "total_wba": 0, "yes_wba": 0})
             
-            # Long-term reports count (>= 12 months)
-            long_term_count = (
-                db.query(ExperienceReport)
-                .join(Ownership)
-                .filter(Ownership.product_id == p.id, ExperienceReport.ownership_duration_months >= 12)
-                .count()
-            )
-
-            # Average satisfaction
-            avg_sat = (
-                db.query(func.avg(ExperienceReport.overall_satisfaction))
-                .join(Ownership)
-                .filter(Ownership.product_id == p.id)
-                .scalar()
-            )
-
-            # Would buy again %
-            total_wba = (
-                db.query(ExperienceReport)
-                .join(Ownership)
-                .filter(Ownership.product_id == p.id)
-                .count()
-            )
-            yes_wba = (
-                db.query(ExperienceReport)
-                .join(Ownership)
-                .filter(Ownership.product_id == p.id, ExperienceReport.would_buy_again == "YES")
-                .count()
-            )
-            wba_pct = round((yes_wba / total_wba) * 100, 1) if total_wba > 0 else None
+            wba_pct = None
+            if stats["total_wba"] > 0:
+                wba_pct = round((stats["yes_wba"] / stats["total_wba"]) * 100, 1)
 
             summary = ProductSummaryResponse(
                 id=p.id,
@@ -102,8 +111,8 @@ class ProductService:
                 updated_at=p.updated_at,
                 variant_count=len(p.variants),
                 total_owners_count=owners_count,
-                long_term_owners_count=long_term_count,
-                avg_overall_satisfaction=round(float(avg_sat), 2) if avg_sat else None,
+                long_term_owners_count=stats["long_term_count"],
+                avg_overall_satisfaction=round(stats["avg_sat"], 2) if stats["avg_sat"] is not None else None,
                 would_buy_again_percentage=wba_pct
             )
             summaries.append(summary)
