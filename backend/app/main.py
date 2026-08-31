@@ -41,6 +41,11 @@ async def lifespan(app: FastAPI):
     # Auto-create tables for local/testing environment (Alembic handles prod migrations)
     Base.metadata.create_all(bind=engine)
     seed_initial_issue_categories()
+    try:
+        from app.seed.seed_famous_smartphones import seed_famous_smartphones
+        seed_famous_smartphones()
+    except Exception as e:
+        logger.error(f"Error seeding famous smartphones on startup: {e}")
     yield
     logger.info("Shutting down WorthIt Platform Backend...")
 
