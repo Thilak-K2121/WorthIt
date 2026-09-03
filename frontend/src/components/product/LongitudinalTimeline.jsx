@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, BatteryCharging, AlertCircle, ArrowRight, TrendingDown } from 'lucide-react';
+import { Calendar, BatteryCharging, AlertCircle, ArrowRight, TrendingDown, Clock, Activity, Zap, Cpu } from 'lucide-react';
 import { getScoreColor } from '../../utils/formatters';
 
 export default function LongitudinalTimeline({ milestones }) {
@@ -27,72 +27,84 @@ export default function LongitudinalTimeline({ milestones }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Horizontal Stack of Milestone Cards */}
+      <div className="space-y-3">
         {milestones.map((m, idx) => (
-          <div key={idx} className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            {/* Top Accent line in Mint */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-[#00D09C]" />
+          <div
+            key={idx}
+            className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col lg:flex-row lg:items-center justify-between gap-5 hover:border-[#00D09C] transition-all"
+          >
+            {/* Left Accent Bar in Mint */}
+            <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-[#00D09C]" />
 
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="font-extrabold text-sm text-slate-900">
+            {/* Left: Tenure Title & Sample Size */}
+            <div className="space-y-1.5 min-w-[200px]">
+              <div className="flex items-center gap-2.5">
+                <Clock className="w-4 h-4 text-[#00D09C] shrink-0" />
+                <span className="font-black text-base text-slate-900">
                   {m.tenure_bucket}
                 </span>
                 <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-semibold border border-slate-200">
                   n={m.reports_count}
                 </span>
               </div>
-
-              {/* Metric Breakdown for this tenure */}
-              <div className="space-y-2 text-xs">
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                  <span className="text-slate-500 font-medium">Overall Score</span>
-                  <span className={`font-black ${getScoreColor(m.avg_overall_satisfaction)}`}>
-                    {m.avg_overall_satisfaction ? `${m.avg_overall_satisfaction.toFixed(1)}/5.0` : 'N/A'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                  <span className="text-slate-500 font-medium">Battery Score</span>
-                  <span className={`font-black ${getScoreColor(m.avg_battery_satisfaction)}`}>
-                    {m.avg_battery_satisfaction ? `${m.avg_battery_satisfaction.toFixed(1)}/5.0` : 'N/A'}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                  <span className="text-slate-500 font-medium">Performance</span>
-                  <span className={`font-black ${getScoreColor(m.avg_performance_satisfaction)}`}>
-                    {m.avg_performance_satisfaction ? `${m.avg_performance_satisfaction.toFixed(1)}/5.0` : 'N/A'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Degradation perception if available */}
-              {m.battery_degradation_breakdown && Object.keys(m.battery_degradation_breakdown).length > 0 && (
-                <div className="mt-3.5 pt-3 border-t border-slate-100">
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-1">
-                    Battery Degradation Reported:
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                    {Object.entries(m.battery_degradation_breakdown).map(([deg, pct]) => (
-                      <span key={deg} className={`px-2 py-0.5 rounded-md border text-[10px] font-medium ${
-                        deg === 'NONE' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
-                        deg === 'MINOR' ? 'bg-teal-50 text-teal-800 border-teal-200' :
-                        'bg-amber-50 text-amber-800 border-amber-200'
-                      }`}>
-                        {deg}: {pct}%
-                      </span>
-                    ))}
-                  </div>
-                </div>
+              {m.common_issues && m.common_issues.length > 0 && (
+                <p className="text-xs text-slate-500 italic pl-6">
+                  "{m.common_issues[0]}"
+                </p>
               )}
             </div>
 
-            {m.common_issues && m.common_issues.length > 0 && (
-              <div className="mt-3 pt-2.5 text-[11px] text-slate-500 italic line-clamp-2 border-t border-slate-100">
-                "{m.common_issues[0]}"
+            {/* Middle: Horizontal Metrics Chips */}
+            <div className="grid grid-cols-3 gap-2.5 sm:gap-3 flex-grow max-w-xl">
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Overall</span>
+                <span className={`font-black text-sm sm:text-base ${getScoreColor(m.avg_overall_satisfaction)}`}>
+                  {m.avg_overall_satisfaction ? `${m.avg_overall_satisfaction.toFixed(1)}/5.0` : 'N/A'}
+                </span>
               </div>
-            )}
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Battery</span>
+                <span className={`font-black text-sm sm:text-base ${getScoreColor(m.avg_battery_satisfaction)}`}>
+                  {m.avg_battery_satisfaction ? `${m.avg_battery_satisfaction.toFixed(1)}/5.0` : 'N/A'}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-center">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Performance</span>
+                <span className={`font-black text-sm sm:text-base ${getScoreColor(m.avg_performance_satisfaction)}`}>
+                  {m.avg_performance_satisfaction ? `${m.avg_performance_satisfaction.toFixed(1)}/5.0` : 'N/A'}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Degradation Perception Tags */}
+            {m.battery_degradation_breakdown && Object.keys(m.battery_degradation_breakdown).length > 0 ? (
+              <div className="space-y-1 lg:text-right shrink-0">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                  Battery Degradation:
+                </span>
+                <div className="flex items-center lg:justify-end gap-1.5 flex-wrap">
+                  {Object.entries(m.battery_degradation_breakdown).map(([deg, pct]) => (
+                    <span
+                      key={deg}
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] font-bold ${
+                        deg === 'NONE'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : deg === 'MINOR'
+                          ? 'bg-teal-50 text-teal-800 border-teal-200'
+                          : deg === 'MODERATE'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                      }`}
+                    >
+                      {deg}: {pct}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
