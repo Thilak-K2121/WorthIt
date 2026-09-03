@@ -1,10 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Cpu, Play, RefreshCw, Clock, CheckCircle2, XCircle, 
-  Smartphone, Inbox, Sparkles, ChevronDown, ChevronUp, ExternalLink, ArrowRight, Layers, Globe
+  Smartphone, Inbox, Sparkles, ChevronDown, ChevronUp, ExternalLink, ArrowRight, Layers, Globe,
+  Search, Shield, Bot, Database, Activity, Zap, Check
 } from 'lucide-react';
 import { api } from '../services/api';
+
+const DISCOVERY_STAGES = [
+  {
+    step: 1,
+    title: 'Tavily Web Search',
+    desc: 'Scanning launch articles, OEM press releases & spec sheets',
+    icon: Search,
+    color: 'text-sky-500',
+    bg: 'bg-sky-50'
+  },
+  {
+    step: 2,
+    title: 'Gemini AI Extraction',
+    desc: 'Extracting clean JSON specs (SoC, RAM, battery, camera, ₹ INR price)',
+    icon: Bot,
+    color: 'text-purple-500',
+    bg: 'bg-purple-50'
+  },
+  {
+    step: 3,
+    title: 'Jaccard Deduplication',
+    desc: 'Evaluating token similarity against existing 98+ phone catalog',
+    icon: Shield,
+    color: 'text-amber-500',
+    bg: 'bg-amber-50'
+  },
+  {
+    step: 4,
+    title: 'Database Ingestion',
+    desc: 'Committing verified phones, variants, and source citations to Supabase',
+    icon: Database,
+    color: 'text-emerald-500',
+    bg: 'bg-emerald-50'
+  }
+];
 
 export default function AdminDiscoveryPage() {
   const [runs, setRuns] = useState([]);
@@ -15,6 +51,11 @@ export default function AdminDiscoveryPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('runs');
   const [expandedRunId, setExpandedRunId] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [activeJobQuery, setActiveJobQuery] = useState('');
+
+  const pollingTimerRef = useRef(null);
+  const elapsedTimerRef = useRef(null);
 
   const refreshData = async () => {
     try {
@@ -30,33 +71,91 @@ export default function AdminDiscoveryPage() {
       if (runsData && runsData.length > 0 && !expandedRunId) {
         setExpandedRunId(runsData[0].id);
       }
+      return runsData || [];
     } catch (err) {
       console.error('Failed to load admin data:', err);
+      return [];
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    const activeStored = localStorage.getItem('worthit_active_discovery');
+    if (activeStored) {
+      try {
+        const parsed = JSON.parse(activeStored);
+        const startedAt = parsed.started_at || Date.now();
+        const initialElapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        setElapsedSeconds(initialElapsed);
+        setActiveJobQuery(parsed.query_topic || 'Latest Smartphone Launches');
+        setRunning(true);
+      } catch (e) {
+        localStorage.removeItem('worthit_active_discovery');
+      }
+    }
     refreshData();
   }, []);
 
+  useEffect(() => {
+    if (running) {
+      elapsedTimerRef.current = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+
+      pollingTimerRef.current = setInterval(async () => {
+        const freshRuns = await refreshData();
+        const activeStored = localStorage.getItem('worthit_active_discovery');
+        if (activeStored) {
+          const parsed = JSON.parse(activeStored);
+          const latestRun = freshRuns[0];
+          if (latestRun && new Date(latestRun.started_at).getTime() >= (parsed.started_at - 10000)) {
+            if (latestRun.status === 'COMPLETED' || latestRun.status === 'FAILED') {
+              localStorage.removeItem('worthit_active_discovery');
+              setRunning(false);
+              setExpandedRunId(latestRun.id);
+              setActiveTab('runs');
+            }
+          }
+        }
+      }, 3500);
+    } else {
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+    }
+
+    return () => {
+      if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      if (pollingTimerRef.current) clearInterval(pollingTimerRef.current);
+    };
+  }, [running]);
+
   const handleTriggerDiscovery = async () => {
+    const jobData = {
+      query_topic: queryTopic,
+      started_at: Date.now()
+    };
+    localStorage.setItem('worthit_active_discovery', JSON.stringify(jobData));
+    setActiveJobQuery(queryTopic);
+    setElapsedSeconds(0);
     setRunning(true);
+
     try {
       const newRun = await api.triggerDiscovery({
         query_topic: queryTopic,
         max_results: 5
       });
+      localStorage.removeItem('worthit_active_discovery');
+      setRunning(false);
       await refreshData();
       if (newRun?.id) {
         setExpandedRunId(newRun.id);
         setActiveTab('runs');
       }
     } catch (err) {
-      alert(`Discovery run failed: ${err.message}`);
-    } finally {
+      localStorage.removeItem('worthit_active_discovery');
       setRunning(false);
+      alert(`Discovery run failed: ${err.message}`);
     }
   };
 
@@ -73,11 +172,11 @@ export default function AdminDiscoveryPage() {
     setExpandedRunId(prev => prev === runId ? null : runId);
   };
 
+  const currentStageIndex = elapsedSeconds < 6 ? 0 : elapsedSeconds < 14 ? 1 : elapsedSeconds < 20 ? 2 : 3;
   const pendingSuggestions = suggestions.filter(s => s.status === 'PENDING');
 
   return (
     <div className="space-y-10 py-8 max-w-5xl mx-auto">
-      {/* 1. Header with Pop-In */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 hero-animate-title">
         <div className="space-y-1">
           <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
@@ -91,14 +190,13 @@ export default function AdminDiscoveryPage() {
 
         <button
           onClick={refreshData}
-          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold flex items-center gap-2 self-start sm:self-auto transition-colors shadow-sm"
+          className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 text-xs font-bold flex items-center gap-2 self-start sm:self-auto transition-colors shadow-sm cursor-pointer"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh Data</span>
         </button>
       </div>
 
-      {/* 2. Top Summary KPI Tiles */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 hero-animate-cards">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-[#00D09C] flex items-center justify-center shrink-0">
@@ -125,13 +223,12 @@ export default function AdminDiscoveryPage() {
             <Inbox className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">Pending Reviews</span>
-            <span className="text-2xl font-black text-amber-700">{pendingSuggestions.length} Pending</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block">User Suggestions</span>
+            <span className="text-2xl font-black text-slate-900">{pendingSuggestions.length} Pending</span>
           </div>
         </div>
       </div>
 
-      {/* 3. Compact 1-Click Discovery Trigger Panel */}
       <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 hero-animate-cards">
         <div className="flex items-center justify-between">
           <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
@@ -149,22 +246,123 @@ export default function AdminDiscoveryPage() {
             type="text"
             value={queryTopic}
             onChange={(e) => setQueryTopic(e.target.value)}
+            disabled={running}
             placeholder="e.g. Latest Smartphone Launches 2026 or Vivo X100 Pro launch"
-            className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium focus:outline-none focus:border-[#00D09C] focus:bg-white transition-colors"
+            className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-slate-900 text-sm font-medium focus:outline-none focus:border-[#00D09C] focus:bg-white transition-colors disabled:opacity-60"
           />
 
           <button
             onClick={handleTriggerDiscovery}
             disabled={running}
-            className="w-full sm:w-auto px-7 py-3 rounded-xl btn-lexi-mint text-xs font-extrabold shadow-mint hover:shadow-mint-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2 shrink-0"
+            className="w-full sm:w-auto px-7 py-3 rounded-xl btn-lexi-mint text-xs font-extrabold shadow-mint hover:shadow-mint-hover transition-all disabled:opacity-50 flex items-center justify-center gap-2 shrink-0 cursor-pointer"
           >
             <Play className="w-4 h-4" />
-            <span>{running ? 'Extracting Phone Data...' : 'Run Discovery'}</span>
+            <span>{running ? 'Discovery in Progress...' : 'Run Discovery'}</span>
           </button>
         </div>
+
+        {running && (
+          <div className="mt-6 p-6 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-950 to-emerald-950 text-white border-2 border-[#00D09C] shadow-2xl space-y-6 relative overflow-hidden animate-fade-in-up">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-[#00D09C]/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+              <div className="flex items-center gap-3.5">
+                <div className="relative flex items-center justify-center w-12 h-12">
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-[#00D09C] opacity-40 animate-ping" />
+                  <span className="relative inline-flex rounded-full h-9 w-9 bg-[#00D09C] text-slate-950 items-center justify-center font-black shadow-lg">
+                    <Activity className="w-5 h-5 animate-pulse" />
+                  </span>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-black text-lg text-white">
+                      Live AI Extraction Radar
+                    </h4>
+                    <span className="text-[10px] uppercase font-black tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00D09C] border border-emerald-500/30 animate-pulse">
+                      Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5 font-mono">
+                    Target: "{activeJobQuery || queryTopic}"
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 self-start sm:self-auto">
+                <div className="px-3.5 py-1.5 rounded-xl bg-slate-800/90 border border-slate-700/80 text-xs font-mono font-bold text-emerald-400 flex items-center gap-2 shadow-inner">
+                  <Clock className="w-3.5 h-3.5 animate-spin" />
+                  <span>Elapsed: {elapsedSeconds}s</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {DISCOVERY_STAGES.map((stg, idx) => {
+                const isPassed = currentStageIndex > idx;
+                const isCurrent = currentStageIndex === idx;
+                const IconComponent = stg.icon;
+
+                return (
+                  <div
+                    key={stg.step}
+                    className={`p-4 rounded-2xl border transition-all relative flex flex-col justify-between min-h-[110px] ${
+                      isCurrent
+                        ? 'bg-slate-800/90 border-[#00D09C] shadow-lg ring-1 ring-[#00D09C]/50'
+                        : isPassed
+                        ? 'bg-slate-900/60 border-emerald-900/60 opacity-90'
+                        : 'bg-slate-900/30 border-slate-800/50 opacity-40'
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            isCurrent ? 'bg-[#00D09C] text-slate-950 font-bold' : isPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'
+                          }`}>
+                            <IconComponent className="w-4 h-4" />
+                          </div>
+                          <span className="text-xs font-black text-white">
+                            {stg.title}
+                          </span>
+                        </div>
+
+                        {isPassed ? (
+                          <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        ) : isCurrent ? (
+                          <span className="w-2.5 h-2.5 rounded-full bg-[#00D09C] animate-ping" />
+                        ) : null}
+                      </div>
+
+                      <p className="text-[11px] text-slate-400 leading-tight">
+                        {stg.desc}
+                      </p>
+                    </div>
+
+                    {isCurrent && (
+                      <div className="mt-2 pt-2 border-t border-slate-700/60 flex items-center gap-1.5 text-[10px] font-bold text-[#00D09C] animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#00D09C]" />
+                        <span>Processing in real time...</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400 bg-slate-950/60 p-3 rounded-2xl border border-slate-800/80">
+              <span className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400 shrink-0" />
+                <span><strong>Persistent Background Worker:</strong> You can safely browse other pages; discovery will finish in the cloud.</span>
+              </span>
+              <span className="text-[11px] text-emerald-400 font-bold">
+                Auto-syncing every 3.5s
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* 4. Tab Navigation */}
       <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveTab('runs')}
