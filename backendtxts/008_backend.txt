@@ -1,3 +1,36 @@
+
+====================================================================================================
+FILE: backend\app\core\logging.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\core\logging.py
+====================================================================================================
+
+import logging
+import sys
+
+def setup_logging():
+    logger = logging.getLogger("worthit")
+    logger.setLevel(logging.INFO)
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        "[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+logger = setup_logging()
+
+
+
+====================================================================================================
+FILE: backend\app\main.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\main.py
+====================================================================================================
+
 # ==============================================================================
 # WorthIt Backend - Main Application Entrypoint
 # ==============================================================================
@@ -108,3 +141,5 @@ def health_check():
 
 # Register all API version 1 route endpoints under prefix (e.g. /api/v1)
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+

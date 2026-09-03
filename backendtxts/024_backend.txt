@@ -1,0 +1,76 @@
+
+====================================================================================================
+FILE: backend\tests\test_deduplication.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\tests\test_deduplication.py
+====================================================================================================
+
+from app.services.deduplication_service import DeduplicationService
+from app.models.product import Product
+
+def test_brand_normalization():
+    assert DeduplicationService.normalize_brand("samsung") == "Samsung"
+    assert DeduplicationService.normalize_brand("apple inc") == "Apple"
+    assert DeduplicationService.normalize_brand("one plus") == "OnePlus"
+    assert DeduplicationService.normalize_brand("1+") == "OnePlus"
+    assert DeduplicationService.normalize_brand("mi") == "Xiaomi"
+    assert DeduplicationService.normalize_brand("nothing tech") == "Nothing"
+
+def test_normalized_key_generation():
+    assert DeduplicationService.generate_normalized_key("Samsung", "Galaxy S26 Ultra 5G") == "samsung-galaxy-s26-ultra"
+    assert DeduplicationService.generate_normalized_key("Apple", "iPhone 15 Pro Max (Global Edition)") == "apple-iphone-15-pro-max"
+    assert DeduplicationService.generate_normalized_key("Xiaomi", "Xiaomi 14 Ultra Dual SIM") == "xiaomi-14-ultra"
+
+def test_find_existing_duplicate_exact_and_fuzzy(db_session):
+    p = Product(
+        brand="Samsung",
+        model_name="Galaxy S24 Ultra",
+        normalized_name="samsung-galaxy-s24-ultra",
+        status="ACTIVE",
+        verification_status="VERIFIED"
+    )
+    db_session.add(p)
+    db_session.commit()
+
+    # Exact match check
+    match, score = DeduplicationService.find_existing_duplicate(db_session, "Samsung", "Galaxy S24 Ultra 5G")
+    assert match is not None
+    assert match.id == p.id
+    assert score == 1.0
+
+    # Token match check
+    match2, score2 = DeduplicationService.find_existing_duplicate(db_session, "Samsung", "S24 Ultra Galaxy")
+    assert match2 is not None
+    assert match2.id == p.id
+    assert score2 >= 0.8
+
+
+
+====================================================================================================
+FILE: backend\tests\test_discovery.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\tests\test_discovery.py
+====================================================================================================
+
+def test_automated_discovery_run_and_idempotency(client):
+    # Trigger discovery run with force_mock=True
+    res = client.post("/api/v1/discovery/run", json={"force_mock": True, "max_results": 2})
+    assert res.status_code == 200
+    run1 = res.json()
+    assert run1["status"] == "COMPLETED"
+    assert run1["new_products_created"] >= 1
+    initial_created = run1["new_products_created"]
+
+    # Trigger second run with identical mock data to test idempotency and duplicate detection
+    res2 = client.post("/api/v1/discovery/run", json={"force_mock": True, "max_results": 2})
+    assert res2.status_code == 200
+    run2 = res2.json()
+    assert run2["status"] == "COMPLETED"
+    # Products discovered in run 1 must now be detected as duplicates
+    assert run2["duplicates_detected"] >= initial_created
+    assert run2["new_products_created"] == 0
+
+    # Verify run list endpoint
+    runs_res = client.get("/api/v1/discovery/runs")
+    assert runs_res.status_code == 200
+    assert len(runs_res.json()) >= 2
+
+

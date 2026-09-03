@@ -1,0 +1,86 @@
+
+====================================================================================================
+FILE: backend\app\api\v1\endpoints\discovery.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\api\v1\endpoints\discovery.py
+====================================================================================================
+
+from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.schemas.discovery import (
+    DiscoveryRunResponse,
+    DiscoveryTriggerRequest
+)
+from app.services.discovery_service import DiscoveryService
+
+router = APIRouter()
+
+@router.post("/run", response_model=DiscoveryRunResponse)
+async def trigger_discovery_run(
+    request: DiscoveryTriggerRequest,
+    db: Session = Depends(get_db)
+):
+    run = await DiscoveryService.run_discovery(
+        db=db,
+        query_topic=request.query_topic or "latest smartphone launch 2026",
+        max_results=request.max_results,
+        force_mock=request.force_mock
+    )
+    return run
+
+@router.get("/runs", response_model=List[DiscoveryRunResponse])
+def list_discovery_runs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db)
+):
+    skip = (page - 1) * page_size
+    return DiscoveryService.list_runs(db, skip=skip, limit=page_size)
+
+@router.get("/runs/{run_id}", response_model=DiscoveryRunResponse)
+def get_discovery_run(
+    run_id: str,
+    db: Session = Depends(get_db)
+):
+    run = DiscoveryService.get_run(db, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Discovery run not found")
+    return run
+
+
+
+====================================================================================================
+FILE: backend\app\api\v1\endpoints\experiences.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\api\v1\endpoints\experiences.py
+====================================================================================================
+
+from typing import List, Optional
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+from app.api.deps import get_db
+from app.schemas.experience import ExperienceReportResponse
+from app.services.ownership_service import ExperienceService
+
+router = APIRouter()
+
+@router.get("/products/{product_id}/experiences", response_model=List[ExperienceReportResponse])
+def list_product_experiences(
+    product_id: str,
+    min_months: Optional[int] = Query(None, description="Minimum ownership duration in months (e.g. 12)"),
+    max_months: Optional[int] = Query(None, description="Maximum ownership duration in months"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(30, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    skip = (page - 1) * page_size
+    return ExperienceService.list_reports_for_product(
+        db=db,
+        product_id=product_id,
+        min_duration_months=min_months,
+        max_duration_months=max_months,
+        skip=skip,
+        limit=page_size
+    )
+
+

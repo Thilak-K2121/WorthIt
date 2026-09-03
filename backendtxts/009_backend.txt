@@ -1,0 +1,61 @@
+
+====================================================================================================
+FILE: backend\app\models\__init__.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\models\__init__.py
+====================================================================================================
+
+from app.models.product import Product, ProductVariant, ProductSource
+from app.models.discovery import ProductDiscoveryRun
+from app.models.ownership import Ownership
+from app.models.experience import ExperienceReport
+from app.models.issue import IssueCategory, ReportedIssue, RepairRecord
+from app.models.suggestion import ProductSuggestion
+
+__all__ = [
+    "Product",
+    "ProductVariant",
+    "ProductSource",
+    "ProductDiscoveryRun",
+    "Ownership",
+    "ExperienceReport",
+    "IssueCategory",
+    "ReportedIssue",
+    "RepairRecord",
+    "ProductSuggestion"
+]
+
+
+
+====================================================================================================
+FILE: backend\app\models\discovery.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\models\discovery.py
+====================================================================================================
+
+import uuid
+from datetime import datetime
+from sqlalchemy import Column, String, DateTime, Integer, Text
+from sqlalchemy.orm import relationship
+from app.core.database import Base
+
+def generate_uuid():
+    return str(uuid.uuid4())
+
+class ProductDiscoveryRun(Base):
+    __tablename__ = "product_discovery_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    started_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    status = Column(String(50), nullable=False, default="RUNNING") # RUNNING, COMPLETED, FAILED
+    sources_searched = Column(Integer, default=0, nullable=False)
+    candidates_found = Column(Integer, default=0, nullable=False)
+    extracted_count = Column(Integer, default=0, nullable=False)
+    duplicates_detected = Column(Integer, default=0, nullable=False)
+    new_products_created = Column(Integer, default=0, nullable=False)
+    failed_count = Column(Integer, default=0, nullable=False)
+    error_log = Column(Text, nullable=True)
+
+    # Relationships
+    sources = relationship("ProductSource", back_populates="discovery_run")
+
+

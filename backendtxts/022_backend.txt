@@ -1,0 +1,598 @@
+
+====================================================================================================
+FILE: backend\BACKEND_EXPLANATION.md
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\BACKEND_EXPLANATION.md
+====================================================================================================
+
+# 📱 WorthIt Backend — Complete Beginner-Friendly Guide
+
+Welcome to the backend documentation for **WorthIt**!
+
+This guide explains **every single folder and file in the backend**, what each file is responsible for, and **what every function does**. Everything is written in plain, simple, everyday language with analogies so anyone (even if you have never built a backend before) can easily understand how it works!
+
+---
+
+## 🌟 1. What is WorthIt Backend? (The Big Picture)
+
+Most smartphone review websites only review a phone on **Day 1** when taking it out of the box. But real problems (battery health dropping, green lines on screens, heating up, software slowdowns) only happen **after 6, 12, or 24 months** of real daily use!
+
+**WorthIt** is a platform where real smartphone owners log their long-term experiences over time. The backend:
+1. Stores a catalog of 98+ smartphones and their hardware variants.
+2. Lets real users record what phone they own and submit reviews at 3 months, 6 months, 12 months, etc.
+3. Automatically calculates **Long-Term Intelligence Scores** (Satisfaction over time, battery degradation percentage, common repair costs).
+4. Compares two smartphones side-by-side using real owner data.
+5. Uses AI (Google Gemini & Tavily Web Search) to automatically search the web and discover newly launched phones.
+
+---
+
+## 🗺️ 2. High-Level Folder Structure
+
+Here is the map of where everything lives inside `backend/app/`:
+
+```
+backend/
+├── app/
+│   ├── main.py              <-- 🚪 The front door: starts the backend server
+│   ├── api/                 <-- 🌐 Web API URLs and endpoints
+│   │   ├── deps.py          <-- 🚰 Helper tools (gives database connections)
+│   │   └── v1/
+│   │       ├── api.py       <-- 📋 Master list of all API routes
+│   │       └── endpoints/   <-- 📍 Specific URL handlers (products, compare, etc.)
+│   ├── core/                <-- ⚙️ Settings, Database connection, Logging
+│   ├── models/              <-- 🗄️ Database Tables (SQLAlchemy)
+│   ├── schemas/             <-- 📦 Data shapes / Blueprints (Pydantic models)
+│   ├── services/            <-- 🧠 Business Logic / Brains of the application
+│   ├── providers/           <-- 🔌 Outside helpers (Gemini AI, Tavily Search)
+│   └── seed/                <-- 🌱 Starter data to fill database with phones & reviews
+├── tests/                   <-- 🧪 Automated test files to verify everything works
+├── requirements.txt         <-- 📜 List of Python libraries needed
+└── worthit.db               <-- 💾 SQLite Database file storing all data
+```
+
+---
+
+## ⚙️ 3. Core Folder (`backend/app/core/`)
+
+These files set up the foundational plumbing for the whole backend: settings, database connections, and logs.
+
+---
+
+### 📄 `app/core/config.py`
+* **What is it?**  
+  The "Settings Control Center" of the application. It reads configuration values from the `.env` file (like API keys and database paths) so the rest of the code can use them easily.
+* **Key Class:**
+  * `Settings`: Holds settings like project name, environment (`development`), API key for Tavily, API key for Google Gemini, and allowed website origins (CORS) so our frontend React app can talk to the backend.
+* **Key Functions:**
+  * `assemble_cors_origins(cls, v)`: Takes a list of allowed website addresses (like `http://localhost:5173`) and formats them properly into a clean Python list.
+
+---
+
+### 📄 `app/core/database.py`
+* **What is it?**  
+  The "Database Pipeline". It connects our Python code to the database (`worthit.db`).
+* **Key Variables & Setup:**
+  * `engine`: The actual connection machine that knows how to speak SQLite or PostgreSQL.
+  * `SessionLocal`: A factory that creates new database sessions whenever a request comes in.
+  * `Base`: The parent blueprint class that all our database tables inherit from.
+* **Key Functions:**
+  * `get_db()`: Opens a fresh database connection when a user makes an API request, gives it to the endpoint, and automatically closes it when the request is done so memory isn't wasted.
+
+---
+
+### 📄 `app/core/logging.py`
+* **What is it?**  
+  The "Activity Diary". It prints neat, color-coded, time-stamped messages to your terminal so you can see what the backend is doing right now (e.g. `[2026-09-03 13:30] [INFO] Product created`).
+* **Key Functions:**
+  * `setup_logging()`: Configures Python's logger with a clean format: `[Date Time] [LEVEL] [Name] Message`.
+
+---
+
+## 🗄️ 4. Models Folder (`backend/app/models/`)
+
+These files define the **Database Tables** using SQLAlchemy. Each class here represents a table in the database, and each attribute represents a column (like `brand`, `price`, `rating`).
+
+---
+
+### 📄 `app/models/product.py`
+* **What is it?**  
+  Stores the smartphone catalog, their hardware variants (RAM/Storage), and where they were found on the web.
+* **Database Tables Defined:**
+  1. `Product` (`products` table):
+     * Columns: `id` (UUID), `brand` (e.g. "Apple"), `model_name` (e.g. "iPhone 16 Pro"), `normalized_name` (e.g. "apple-iphone-16-pro"), `release_date`, `status` ("ACTIVE"), `verification_status` ("VERIFIED"), `description`.
+  2. `ProductVariant` (`product_variants` table):
+     * Columns: `id`, `product_id` (links to Product), `ram` (e.g. "12GB"), `storage` (e.g. "256GB"), `chipset` (e.g. "Snapdragon 8 Gen 3"), `launch_price` (e.g. 59999.00), `currency` ("INR").
+  3. `ProductSource` (`product_sources` table):
+     * Columns: `id`, `product_id`, `source_url`, `source_title`, `source_snippet`, `provider` ("TAVILY"), `discovered_at`.
+
+---
+
+### 📄 `app/models/ownership.py`
+* **What is it?**  
+  Stores who owns which phone and when they bought it.
+* **Database Table Defined:**
+  * `Ownership` (`ownerships` table):
+    * Columns: `id`, `product_id`, `variant_id`, `purchase_date`, `purchase_price`, `currency`, `status` ("CURRENTLY_OWNING" or "PREVIOUSLY_OWNED"), `previous_phone` (what they used before), `purchase_source` (e.g. "Amazon", "Offline Store"), `created_at`.
+    * Links to all `ExperienceReport` records for this device over time.
+
+---
+
+### 📄 `app/models/experience.py`
+* **What is it?**  
+  Stores a user's periodic review at different months of owning the phone (e.g. at 3 months, 12 months, 24 months).
+* **Database Table Defined:**
+  * `ExperienceReport` (`experience_reports` table):
+    * Columns:
+      * `ownership_id`: Which ownership record this review belongs to.
+      * `ownership_duration_months`: How many months they have used the phone (e.g. 12).
+      * Ratings (1.0 to 5.0): `overall_satisfaction`, `battery_satisfaction`, `performance_satisfaction`, `software_satisfaction`, `camera_satisfaction`, `build_satisfaction`.
+      * Long-term nuances: `battery_degradation_perception` ("NONE", "MINOR", "MODERATE", "SEVERE"), `heating_experience` ("COOL", "NORMAL", "FREQUENT_OVERHEATING"), `software_update_experience`.
+      * Repurchase verdict: `would_buy_again` ("YES", "NO", "UNSURE"), `would_buy_again_reason`.
+      * Free text: `biggest_positive`, `biggest_problem`, `general_notes`.
+
+---
+
+### 📄 `app/models/issue.py`
+* **What is it?**  
+  Stores specific hardware or software defects reported by users (like green lines on display, motherboard death, battery drain) and repair details.
+* **Database Tables Defined:**
+  1. `IssueCategory` (`issue_categories` table):
+     * Standard categories like `battery`, `heating`, `display`, `camera`, `charging`, `software`, `performance`, `connectivity`, `build`, `speaker_mic`.
+  2. `ReportedIssue` (`reported_issues` table):
+     * Specific issue reported in a review. Contains `issue_title`, `severity` ("LOW", "MODERATE", "SEVERE", "CRITICAL"), `occurred_at_month`, `resolved`, `repair_required`, `repair_cost`.
+  3. `RepairRecord` (`repair_records` table):
+     * Specific repair bills. Contains `part_replaced` ("SCREEN", "BATTERY", "MOTHERBOARD"), `official_service_center` (True/False), `covered_under_warranty`, `cost`, `currency`.
+
+---
+
+### 📄 `app/models/suggestion.py`
+* **What is it?**  
+  Stores suggestions submitted by users when a smartphone they want is missing from the catalog.
+* **Database Table Defined:**
+  * `ProductSuggestion` (`product_suggestions` table):
+    * Columns: `brand`, `model_name`, `variant_details`, `official_url`, `notes`, `status` ("PENDING", "APPROVED", "REJECTED", "DUPLICATE"), `submitter_ip_hash`.
+
+---
+
+### 📄 `app/models/discovery.py`
+* **What is it?**  
+  Stores history logs of automated AI web scraping runs that search for new smartphone launches.
+* **Database Table Defined:**
+  * `ProductDiscoveryRun` (`product_discovery_runs` table):
+    * Columns: `id`, `started_at`, `completed_at`, `status` ("RUNNING", "COMPLETED", "FAILED"), `sources_searched`, `candidates_found`, `extracted_count`, `duplicates_detected`, `new_products_created`, `error_log`.
+
+---
+
+### 📄 `app/models/__init__.py`
+* **What is it?**  
+  A single import hub that exports all models together so other files can import them cleanly in one line:
+  `from app.models import Product, Ownership, ExperienceReport`.
+
+---
+
+## 📦 5. Schemas Folder (`backend/app/schemas/`)
+
+These files define the **Pydantic Data Blueprints**. They make sure that any data coming from the frontend (via POST/PUT requests) is valid and correctly formatted, and they shape what JSON data goes back to the browser.
+
+---
+
+### 📄 `app/schemas/common.py`
+* **What is it?**  
+  Reusable response wrappers used across multiple endpoints.
+* **Classes:**
+  * `PaginatedResponse[T]`: Wraps lists of data with pagination numbers (`items`, `total`, `page`, `page_size`, `total_pages`).
+  * `APIResponse[T]`: Generic wrapper returning `{ success: True, message: "...", data: ... }`.
+
+---
+
+### 📄 `app/schemas/product.py`
+* **What is it?**  
+  Blueprints for products and variants.
+* **Classes:**
+  * `ProductVariantBase`, `ProductVariantCreate`, `ProductVariantResponse`: Holds RAM, storage, chipset, price.
+  * `ProductBase`, `ProductCreate`, `ProductUpdate`: Holds brand, model name, release date, description.
+  * `ProductSummaryResponse`: Used for the catalog grid card (includes average rating, owner counts, repurchase %).
+  * `ProductDetailResponse`: Used for full smartphone detail page (includes variants, sources, full specs).
+
+---
+
+### 📄 `app/schemas/ownership.py`
+* **What is it?**  
+  Blueprints for registering an ownership record.
+* **Classes:**
+  * `OwnershipCreate`: The form data sent when someone says "I own this phone" (purchase date, price, where bought, optional first review).
+  * `OwnershipResponse`: The clean JSON returned back to the user after saving ownership.
+
+---
+
+### 📄 `app/schemas/experience.py`
+* **What is it?**  
+  Blueprints for experience reviews, reported issues, and repair bills.
+* **Classes:**
+  * `ReportedIssueCreate`, `ReportedIssueResponse`: For submitting and reading hardware issues.
+  * `RepairRecordCreate`, `RepairRecordResponse`: For submitting and reading repair costs.
+  * `ExperienceReportCreate`, `ExperienceReportResponse`: For submitting and reading full multi-month review forms.
+
+---
+
+### 📄 `app/schemas/insights.py`
+* **What is it?**  
+  Blueprints for statistical intelligence calculations and product comparison matrices.
+* **Classes:**
+  * `SampleConfidence`: Tells users how reliable the data is (e.g. "Early Data", "High Statistical Confidence").
+  * `MetricScore`: Formatted scores out of 5.0 with sample size count.
+  * `WouldBuyAgainStats`: Percentages of YES / NO / UNSURE and top quoted reasons.
+  * `IssueCategoryStats`: Percentage of owners who faced battery, screen, or heating issues.
+  * `RepairIntelligence`: Median repair costs and most commonly replaced parts.
+  * `OwnershipTimelineMilestone`: Experience progression split into buckets: 1-3m, 4-6m, 7-12m, 13-18m, 19-24m+.
+  * `ProductInsightsResponse`: The master JSON dossier for a single smartphone.
+  * `ProductComparisonResponse`: The side-by-side comparison result for two phones with AI-calculated key takeaways.
+
+---
+
+### 📄 `app/schemas/suggestion.py`
+* **What is it?**  
+  Blueprints for submitting and reviewing missing phone suggestions.
+* **Classes:**
+  * `ProductSuggestionCreate`: Form to suggest a phone.
+  * `ProductSuggestionReview`: Admin action to APPROVE, REJECT, or MARK_DUPLICATE.
+  * `ProductSuggestionResponse`: JSON representation of a suggestion.
+
+---
+
+### 📄 `app/schemas/discovery.py`
+* **What is it?**  
+  Blueprints for the automated AI web crawler.
+* **Classes:**
+  * `ExtractedVariant`: RAM, Storage, Chipset, Price extracted from a website snippet.
+  * `ExtractedPhoneSpec`: Full phone details extracted by Gemini AI from a web page.
+  * `DiscoveryTriggerRequest`: Request body to trigger a new scraping run.
+  * `DiscoveryRunResponse`: Status, sources searched, products created during a discovery run.
+
+---
+
+## 🧠 6. Services Folder (`backend/app/services/`)
+
+This is the **business logic layer** (the "brains"). When an API endpoint receives a request, it calls these services to do the heavy lifting, calculations, and database modifications.
+
+---
+
+### 📄 `app/services/product_service.py`
+* **What is it?**  
+  Handles catalog queries, high-performance database searches, and creating/updating smartphones.
+* **Key Functions:**
+  1. `get_by_id(db, product_id)`:
+     * **What it does:** Finds a single phone by its UUID and loads all its variants and web sources in one go.
+     * **Returns:** The Product object or `None`.
+  2. `list_products(db, search, brand, status, skip, limit, sort_by)`:
+     * **What it does:** Searches, filters, and sorts the smartphone catalog.
+     * **Special Feature:** Uses fast SQL bulk aggregations (`GROUP BY` and `case()`) to calculate average ratings and owner counts for 20+ phones in just ~40 milliseconds (preventing slow loading times).
+     * **Returns:** A tuple of `(list of product summaries, total count)`.
+  3. `create_product(db, product_in)`:
+     * **What it does:** Adds a brand new smartphone and its hardware variants into the database, generating a clean URL slug (e.g. `samsung-galaxy-s24`).
+     * **Returns:** The created Product object.
+  4. `update_product(db, product_id, product_in)`:
+     * **What it does:** Updates existing fields of a smartphone (e.g. new description or official URL).
+     * **Returns:** The updated Product object.
+
+---
+
+### 📄 `app/services/ownership_service.py`
+* **What is it?**  
+  Manages phone ownership records and experience reviews submitted by users.
+* **Contains Two Service Classes:**
+  #### 1. `OwnershipService`:
+  * `get_by_id(db, ownership_id)`: Fetches an ownership record with all linked reviews, issues, and repair bills.
+  * `list_by_product(db, product_id, skip, limit)`: Returns all ownership records for a specific smartphone.
+  * `create_ownership(db, data, session_hash)`: Saves that a user purchased a phone. If they also included a review in the same submission, it automatically calls `ExperienceService` to save that too.
+  #### 2. `ExperienceService`:
+  * `add_experience_report(db, ownership_id, report_in)`: Saves a new review milestone (e.g. 6-month review), records any hardware issues (with their severity), and records any repair receipts.
+  * `list_reports_for_product(db, product_id, min_duration_months, max_duration_months, skip, limit)`: Returns reviews for a phone, with optional filtering (e.g. "show only 12+ month reviews").
+
+---
+
+### 📄 `app/services/intelligence_service.py`
+* **What is it?**  
+  The mathematical engine that turns hundreds of raw reviews into clean, actionable statistics, charts, and comparisons.
+* **Key Functions:**
+  1. `get_sample_confidence(sample_size, long_term_size)`:
+     * **What it does:** Evaluates how much we can trust the ratings. If a phone only has 1 review, it marks it as `VERY_LOW` confidence. If it has 100+ owners with 20+ long-term owners, it marks it as `HIGH` statistical confidence.
+     * **Why it matters:** Prevents 1 biased review from misleading buyers.
+  2. `compute_product_insights(db, product_id)`:
+     * **What it does:** Calculates the complete intelligence profile for a phone:
+       * Average scores for Battery, Performance, Camera, Software.
+       * 12-month satisfaction score.
+       * Percentage of owners who would buy it again.
+       * Issue category breakdown (e.g. 15% had display issues, 8% had battery drain).
+       * Median repair cost in INR.
+       * Timeline progression buckets (1-3m, 4-6m, 7-12m, 13-18m, 19-24m+).
+  3. `compare_products(db, product_a_id, product_b_id)`:
+     * **What it does:** Fetches insights for two phones side-by-side, compares their satisfaction, battery life, repurchase intent, and repair rates, and writes dynamic key takeaway bullet points (e.g. *"Phone A leads in long-term battery satisfaction (4.8 vs 4.1)"*).
+  4. `_build_comparison_item(db, product_id)`:
+     * **What it does:** Helper function that packages a single phone's intelligence data into a standard comparison card.
+
+---
+
+### 📄 `app/services/deduplication_service.py`
+* **What is it?**  
+  Prevents duplicate phones in the catalog when scraping the web or when users suggest phones.
+* **Key Functions:**
+  1. `normalize_brand(brand_raw)`:
+     * **What it does:** Converts informal brand names into standard names (e.g. `'1+'` or `'one plus'` -> `'OnePlus'`, `'apple inc'` -> `'Apple'`).
+  2. `generate_normalized_key(brand, model_name)`:
+     * **What it does:** Cleans up titles by stripping out marketing buzzwords (like `5G`, `Global Edition`, `Dual SIM`) and creates a clean slug (e.g. `"Samsung Galaxy S24 Ultra 5G Global"` becomes `"samsung-galaxy-s24-ultra"`).
+  3. `find_existing_duplicate(db, brand, model_name)`:
+     * **What it does:** Checks if a phone already exists in the database using two smart steps:
+       1. Exact slug match.
+       2. Token Jaccard Set similarity (calculates word overlap percentage). If similarity is $\ge 80\%$, it flags it as an existing phone instead of creating a duplicate!
+
+---
+
+### 📄 `app/services/discovery_service.py`
+* **What is it?**  
+  Orchestrates the automated web discovery process.
+* **Key Functions:**
+  1. `run_discovery(db, query_topic, max_results, force_mock)`:
+     * **What it does:**
+       1. Creates a new `ProductDiscoveryRun` log in the database.
+       2. Calls Tavily to search the web for smartphone launch news.
+       3. Feeds each web snippet into Google Gemini AI to extract structured phone specs.
+       4. Checks with `DeduplicationService` if the phone already exists.
+       5. If new: adds the phone, variants, and source link to the catalog.
+       6. If existing: links the new web source to the existing phone.
+       7. Returns the completed run summary.
+  2. `list_runs(db, skip, limit)`: Returns previous discovery run logs.
+  3. `get_run(db, run_id)`: Returns details of a single discovery run.
+
+---
+
+### 📄 `app/services/suggestion_service.py`
+* **What is it?**  
+  Handles user suggestions for missing phones and admin approval workflows.
+* **Key Functions:**
+  1. `create_suggestion(db, suggestion_in, ip_hash)`:
+     * Checks if the suggested phone already exists in the catalog. If yes, marks status as `DUPLICATE`. Otherwise, saves it as `PENDING`.
+  2. `list_suggestions(db, status, skip, limit)`:
+     * Returns a list of suggestions filtered by status (`PENDING`, `APPROVED`, `REJECTED`).
+  3. `review_suggestion(db, suggestion_id, review)`:
+     * If admin clicks **APPROVE**: automatically creates the real `Product` in the catalog and marks suggestion as `APPROVED`.
+     * If admin clicks **REJECT** or **MARK_DUPLICATE**: updates the suggestion status accordingly.
+
+---
+
+## 🔌 7. Providers Folder (`backend/app/providers/`)
+
+These files handle communication with external third-party AI APIs (Google Gemini and Tavily Search).
+
+---
+
+### 📄 `app/providers/base.py`
+* **What is it?**  
+  The abstract blueprint defining what methods any search or AI extractor provider must implement.
+* **Classes:**
+  * `DiscoverySearchResult`: Simple container for `url`, `title`, `snippet`, and `raw_data`.
+  * `DiscoveryProvider` (Interface): Requires `search_smartphone_launches(query, max_results)`.
+  * `ExtractorProvider` (Interface): Requires `extract_smartphone_specs(source_text, source_url, source_title)`.
+
+---
+
+### 📄 `app/providers/tavily_provider.py`
+* **What is it?**  
+  Uses the Tavily Search API to search top tech sites (GSMArena, The Verge, Gadgets360, AndroidCentral) for new phone announcements.
+* **Key Class:**
+  * `TavilyProvider`: Sends an HTTP POST request to Tavily's search API. If no API key is provided, it automatically falls back to `MockTavilyProvider`.
+
+---
+
+### 📄 `app/providers/gemini_provider.py`
+* **What is it?**  
+  Uses Google Gemini AI (`gemini-3.5-flash` / `gemini-3.5-flash-lite`) to read raw web search text and extract clean, strict JSON data (Brand, Model, RAM, Storage, Chipset, Launch Price).
+* **Key Class:**
+  * `GeminiExtractor`: Sends structured extraction prompts to Google's Generative Language API. It includes automatic model cascading (if one model hits rate limits, it tries the next) and cleans markdown ticks from the output.
+
+---
+
+### 📄 `app/providers/mock_providers.py`
+* **What is it?**  
+  Simulated providers that return realistic smartphone data (e.g. *Nothing Phone (3)*, *Xiaomi 15 Ultra*, *Google Pixel 9a*, *Samsung Galaxy S25 FE*) without needing internet or real API keys.
+* **Classes:**
+  * `MockTavilyProvider`: Returns fake search results for testing.
+  * `MockGeminiExtractor`: Uses pattern matching to extract specs for testing.
+
+---
+
+## 🌐 8. API & Endpoints Folder (`backend/app/api/`)
+
+These files define the **HTTP REST URLs** that the frontend (or mobile app) calls.
+
+---
+
+### 📄 `app/api/deps.py`
+* **What is it?**  
+  FastAPI dependency injection tools.
+* **Key Functions:**
+  * `get_db()`: Gives an endpoint an active database session and ensures it closes when done.
+  * `get_client_session_hash(request)`: Creates an anonymous SHA-256 hash of the client's IP and browser header for rate-limiting and session identification without saving personal info.
+
+---
+
+### 📄 `app/api/v1/api.py`
+* **What is it?**  
+  The Master Router. It brings together all individual endpoint files and mounts them under the `/api/v1` prefix.
+
+---
+
+### 📄 `app/api/v1/endpoints/products.py`
+* **What is it?**  
+  URLs for browsing and viewing smartphones.
+* **Endpoints:**
+  1. `GET /api/v1/products`:
+     * Returns a paginated list of smartphones with filter options (`search`, `brand`, `status`, `sort_by`, `page`, `page_size`).
+  2. `GET /api/v1/products/{product_id}`:
+     * Returns full specifications, variants, and source links for one specific phone.
+  3. `POST /api/v1/products`:
+     * Admin endpoint to create a new smartphone manually.
+
+---
+
+### 📄 `app/api/v1/endpoints/compare.py`
+* **What is it?**  
+  URLs for comparing two smartphones.
+* **Endpoint:**
+  * `GET /api/v1/products/compare?product_a={id1}&product_b={id2}`:
+    * Compares two phones side-by-side on long-term satisfaction, battery health, repurchase rate, repair frequency, and key takeaways.
+
+---
+
+### 📄 `app/api/v1/endpoints/ownerships.py`
+* **What is it?**  
+  URLs for registering phone ownership and adding follow-up reviews.
+* **Endpoints:**
+  1. `POST /api/v1/ownerships`:
+     * User registers that they bought a phone (and optionally submits their first review).
+  2. `GET /api/v1/ownerships/{ownership_id}`:
+     * Fetches details of an ownership record.
+  3. `POST /api/v1/ownerships/{ownership_id}/reports`:
+     * Submits a subsequent review milestone (e.g. "I have now owned this phone for 12 months").
+
+---
+
+### 📄 `app/api/v1/endpoints/experiences.py`
+* **What is it?**  
+  URLs for reading user experience reviews.
+* **Endpoint:**
+  * `GET /api/v1/products/{product_id}/experiences`:
+    * Returns all real owner reviews for a phone, with optional filters like `min_months=12`.
+
+---
+
+### 📄 `app/api/v1/endpoints/insights.py`
+* **What is it?**  
+  URLs for fetching calculated statistics.
+* **Endpoint:**
+  * `GET /api/v1/products/{product_id}/insights`:
+    * Returns the complete statistical dossier: scores, confidence badges, battery degradation breakdown, issue categories, repair costs, and tenure timeline.
+
+---
+
+### 📄 `app/api/v1/endpoints/suggestions.py`
+* **What is it?**  
+  URLs for community suggestions.
+* **Endpoints:**
+  1. `POST /api/v1/product-suggestions`: User submits a suggestion for a missing phone.
+  2. `GET /api/v1/product-suggestions`: Lists suggestions (with status filter `PENDING`, `APPROVED`, etc.).
+  3. `POST /api/v1/product-suggestions/{id}/review`: Admin approves or rejects a suggestion.
+
+---
+
+### 📄 `app/api/v1/endpoints/discovery.py`
+* **What is it?**  
+  URLs for automated AI web discovery.
+* **Endpoints:**
+  1. `POST /api/v1/discovery/run`: Triggers a new AI web discovery search run.
+  2. `GET /api/v1/discovery/runs`: Lists all previous discovery runs.
+  3. `GET /api/v1/discovery/runs/{run_id}`: Fetches details and sources of a specific discovery run.
+
+---
+
+## 🚪 9. Main Application Entrypoint (`backend/app/main.py`)
+
+* **What is it?**  
+  The very first file that runs when the server starts. It sets up FastAPI, configures CORS, handles startup tasks, and connects all routes.
+* **Key Functions:**
+  1. `seed_initial_issue_categories()`:
+     * Runs on startup. Inserts standard hardware/software issue categories (Battery, Heating, Display, etc.) into the database if they are not already there.
+  2. `lifespan(app)`:
+     * Startup and shutdown manager. When the server turns on, it:
+       * Creates all database tables if they don't exist (`Base.metadata.create_all`).
+       * Seeds the standard issue taxonomy categories.
+       * Seeds 98+ famous smartphones across 17 brands.
+  3. `health_check()` (`GET /health`):
+     * A simple heartbeat check returning `{"status": "healthy"}` to verify the backend is running.
+
+---
+
+## 🌱 10. Seed Scripts (`backend/app/seed/`)
+
+These scripts populate the database with realistic sample data so you can test the application right away.
+
+---
+
+### 📄 `app/seed/seed_famous_smartphones.py`
+* **What is it?**  
+  Contains data for **98+ popular smartphones** from 17 brands (Apple, Samsung, Google, OnePlus, Xiaomi, Nothing, Motorola, Vivo, iQOO, Realme, etc.) with their real Indian launch prices, RAM/storage variants, and release dates.
+* **Key Functions:**
+  * `seed_famous_smartphones()`: Inserts all 98+ phones and their variants into the database without creating duplicates.
+
+---
+
+### 📄 `app/seed/seed_data.py`
+* **What is it?**  
+  Seeds realistic **longitudinal ownership records and multi-month reviews** for flagship devices (Pixel 8 Pro, Galaxy S23 Ultra, iPhone 15 Pro, OnePlus 12).
+* **Key Functions:**
+  * `seed_database()`: Clears old records and generates realistic reviews at 3-month, 6-month, 12-month, and 24-month intervals, complete with realistic issue reports (screen tints, battery drops) and repair costs.
+
+---
+
+## 🧪 11. Test Suite (`backend/tests/`)
+
+These files use `pytest` to automatically test backend functions to guarantee there are no bugs.
+
+* `conftest.py`: Creates a temporary in-memory database and test API client for every test.
+* `test_products.py`: Verifies that listing, searching, filtering, and fetching products works.
+* `test_ownerships.py`: Verifies registering phone ownership and adding 6m/12m experience reviews.
+* `test_intelligence.py`: Verifies satisfaction calculations, confidence badges, and side-by-side comparison logic.
+* `test_deduplication.py`: Verifies brand normalization and duplicate prevention algorithms.
+* `test_discovery.py`: Verifies automated web discovery runs.
+* `test_suggestions.py`: Verifies submitting and approving user suggestions.
+
+---
+
+## 🚀 12. How to Run & Explore the Backend
+
+### 1. Start the Backend Server:
+```powershell
+cd backend
+python -m uvicorn app.main:app --reload --port 8000
+```
+
+### 2. View Interactive Swagger API Documentation:
+Open your browser and navigate to:
+👉 **[http://localhost:8000/api/v1/docs](http://localhost:8000/api/v1/docs)**
+
+Here, you can test every endpoint live directly from your web browser!
+
+### 3. Run Automated Tests:
+```powershell
+cd backend
+pytest
+```
+
+---
+
+## 💡 Summary Cheat Sheet
+
+| Layer | Folder / File | Simple Purpose |
+| :--- | :--- | :--- |
+| **Entrypoint** | `app/main.py` | Starts the server, loads tables, seeds initial data |
+| **Config & DB** | `app/core/` | Reads `.env` settings, connects to SQLite database, sets up logging |
+| **Database Tables** | `app/models/` | Defines tables: Products, Variants, Ownerships, Reviews, Issues, Repairs |
+| **Data Validation** | `app/schemas/` | Validates incoming JSON and formats outgoing responses (Pydantic) |
+| **Business Logic** | `app/services/` | Calculates scores, compares devices, prevents duplicates, performs searches |
+| **AI Providers** | `app/providers/` | Talks to Google Gemini (spec extractor) and Tavily (web search) |
+| **Web Endpoints** | `app/api/v1/endpoints/` | URLs for frontend: `/products`, `/compare`, `/ownerships`, `/insights` |
+| **Seed Data** | `app/seed/` | Fills database with 98+ smartphones and multi-year reviews |
+| **Tests** | `tests/` | Automated test suite verifying every component works perfectly |
+
+
+
+====================================================================================================
+FILE: backend\pytest.ini
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\pytest.ini
+====================================================================================================
+
+[pytest]
+pythonpath = .
+asyncio_mode = auto
+testpaths = tests
+
+

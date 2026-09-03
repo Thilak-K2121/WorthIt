@@ -1,14 +1,33 @@
+// ==============================================================================
+// Ownership Intake Form - 3-Step Longitudinal Review Wizard
+// ==============================================================================
+// This component provides a multi-step user experience intake wizard:
+// Step 1: Device Model Selection & Purchase Price
+// Step 2: Longitudinal Duration (3, 6, 12, 24 months) & Multi-Category Ratings
+// Step 3: Battery Degradation Perception, Written Notes, and Repurchase Verdict
+// ==============================================================================
+
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 
   Smartphone, Battery, Award, ThumbsUp, ThumbsDown, 
-  HelpCircle, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Camera, ShieldCheck
+  HelpCircle, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Camera, ShieldCheck,
+  AlertTriangle, Wrench, ShieldAlert
 } from 'lucide-react';
 
+/**
+ * 3-Step Longitudinal Ownership Form Component.
+ * 
+ * @param {Array} products - Available smartphone models for dropdown selection.
+ * @param {Function} onSubmit - Callback function receiving the formatted JSON payload.
+ * @param {boolean} isSubmitting - Loading state flag during async API submission.
+ * @param {string} requestedBrand - Pre-selected brand query parameter (e.g. 'Vivo').
+ * @param {string} requestedProductId - Pre-selected smartphone UUID query parameter.
+ */
 export default function OwnershipForm({ products, onSubmit, isSubmitting, requestedBrand, requestedProductId }) {
   const [step, setStep] = useState(1);
 
-  // Form State
+  // Form State: Captures device selection, ownership duration, ratings, and feedback
   const [formData, setFormData] = useState({
     product_id: requestedProductId || '',
     purchase_price: '',
@@ -22,6 +41,16 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
     biggest_positive: '',
     biggest_problem: ''
   });
+
+  // Specific Hardware Issue & Repair State
+  const [hasIssues, setHasIssues] = useState(false);
+  const [issueCategory, setIssueCategory] = useState('display');
+  const [issueTitle, setIssueTitle] = useState('');
+  const [occurredAtMonth, setOccurredAtMonth] = useState(6);
+  const [repairRequired, setRepairRequired] = useState(false);
+  const [repairPart, setRepairPart] = useState('SCREEN');
+  const [repairCost, setRepairCost] = useState('');
+  const [officialServiceCenter, setOfficialServiceCenter] = useState(true);
 
   const matchingBrandProducts = requestedBrand
     ? products.filter(p => p.brand.toLowerCase() === requestedBrand.toLowerCase())
@@ -62,7 +91,22 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
         battery_degradation_perception: formData.battery_degradation_perception,
         would_buy_again: formData.would_buy_again,
         biggest_positive: formData.biggest_positive || undefined,
-        biggest_problem: formData.biggest_problem || undefined
+        biggest_problem: formData.biggest_problem || undefined,
+        issues: hasIssues && issueCategory ? [{
+          category_slug: issueCategory,
+          issue_title: issueTitle.trim() || `${issueCategory.charAt(0).toUpperCase() + issueCategory.slice(1)} hardware or software issue`,
+          severity: 'MODERATE',
+          occurred_at_month: occurredAtMonth ? parseInt(occurredAtMonth) : undefined,
+          repair_required: repairRequired,
+          resolved: true
+        }] : undefined,
+        repairs: hasIssues && repairRequired ? [{
+          part_replaced: repairPart || 'SCREEN',
+          cost: repairCost ? parseFloat(repairCost) : 0,
+          official_service_center: officialServiceCenter,
+          covered_under_warranty: !repairCost || parseFloat(repairCost) === 0,
+          currency: 'INR'
+        }] : undefined
       }
     };
     onSubmit(payload);
@@ -362,6 +406,135 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
                 onChange={(e) => setFormData({ ...formData, biggest_problem: e.target.value })}
                 className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-300 text-slate-900 text-sm focus:outline-none focus:border-[#00D09C] focus:bg-white"
               />
+            </div>
+
+            {/* Hardware & Software Issue Intake Section */}
+            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-bold text-slate-900">Did you encounter any specific hardware fault or failure?</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasIssues}
+                    onChange={(e) => setHasIssues(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00D09C]"></div>
+                </label>
+              </div>
+
+              {hasIssues && (
+                <div className="space-y-4 pt-2 border-t border-slate-200 animate-fade-in-up">
+                  {/* Category Selection */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                      Fault Category
+                    </label>
+                    <select
+                      value={issueCategory}
+                      onChange={(e) => setIssueCategory(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs font-semibold focus:outline-none focus:border-[#00D09C]"
+                    >
+                      <option value="display">Display (Green Line / Burn-in / Touch Latency)</option>
+                      <option value="battery">Battery (Rapid Drain / Swelling / Capacity Drop)</option>
+                      <option value="heating">Heating / Thermal Throttling</option>
+                      <option value="motherboard">Motherboard / Dead Boot / Re-balling</option>
+                      <option value="charging">Charging Port / Slow Charge / Loose Cable</option>
+                      <option value="camera">Camera (Autofocus / Lens Fog / Sensor Error)</option>
+                      <option value="software">Software (Crash Loops / UI Stutter / Update Bugs)</option>
+                      <option value="build">Build / Physical Fracture (Frame / Back Glass)</option>
+                      <option value="other">Other Miscellaneous Issue</option>
+                    </select>
+                  </div>
+
+                  {/* Specific Description & Month */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Specific Symptom
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Vertical green line appeared after OTA update"
+                        value={issueTitle}
+                        onChange={(e) => setIssueTitle(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#00D09C]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                        Occurred At Month
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="60"
+                        value={occurredAtMonth}
+                        onChange={(e) => setOccurredAtMonth(e.target.value)}
+                        className="w-full px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#00D09C]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Repair Sub-section */}
+                  <div className="pt-2 border-t border-slate-200">
+                    <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={repairRequired}
+                        onChange={(e) => setRepairRequired(e.target.checked)}
+                        className="rounded accent-[#00D09C]"
+                      />
+                      <span>Did you have to get this device repaired?</span>
+                    </label>
+
+                    {repairRequired && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white p-3 rounded-xl border border-slate-200 animate-fade-in-up">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Part Replaced</label>
+                          <select
+                            value={repairPart}
+                            onChange={(e) => setRepairPart(e.target.value)}
+                            className="w-full p-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-800"
+                          >
+                            <option value="SCREEN">Display / Screen</option>
+                            <option value="BATTERY">Battery</option>
+                            <option value="MOTHERBOARD">Motherboard</option>
+                            <option value="CAMERA">Camera Module</option>
+                            <option value="PORT">Charging Port</option>
+                            <option value="BACK_GLASS">Back Glass</option>
+                            <option value="OTHER">Other Part</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Cost Paid (₹ INR)</label>
+                          <input
+                            type="number"
+                            placeholder="0 for warranty"
+                            value={repairCost}
+                            onChange={(e) => setRepairCost(e.target.value)}
+                            className="w-full p-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Service Center</label>
+                          <select
+                            value={officialServiceCenter ? 'true' : 'false'}
+                            onChange={(e) => setOfficialServiceCenter(e.target.value === 'true')}
+                            className="w-full p-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs text-slate-800"
+                          >
+                            <option value="true">Official Brand Center</option>
+                            <option value="false">Third-Party / Local</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 flex items-center justify-between">

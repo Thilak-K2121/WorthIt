@@ -1,3 +1,12 @@
+// ==============================================================================
+// Product List Page - 17-Brand Directory & Search Catalog View
+// ==============================================================================
+// This page provides a dual-view experience:
+// 1. Default Directory View: 17 curated brand cards with visual badges and model counts.
+// 2. Filtered/Search View: Brand spotlight header with model grid and longitudinal metrics.
+// Includes buffered search input to prevent keystroke focus hijacking and 1-click filter reset.
+// ==============================================================================
+
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 
@@ -7,7 +16,7 @@ import {
 import { api } from '../services/api';
 import ProductCard from '../components/product/ProductCard';
 
-// Comprehensive Brand Registry covering all major global and Indian smartphone brands
+// Brand Registry: Curated metadata (names, taglines, icons, and themes) for all 17 supported smartphone manufacturers
 const BRAND_REGISTRY = {
   'apple': {
     name: 'Apple',
@@ -227,6 +236,9 @@ export default function ProductListPage() {
     };
   };
 
+  /**
+   * Sets the active brand filter in the URL query string and triggers data fetch.
+   */
   const handleSelectBrand = (brandName) => {
     const newParams = new URLSearchParams();
     if (brandName) {
@@ -235,11 +247,19 @@ export default function ProductListPage() {
     setSearchParams(newParams);
   };
 
+  /**
+   * Clears all brand and search parameters from the URL and resets input buffer,
+   * returning the user to the 17-brand directory.
+   */
   const handleClearAllFilters = () => {
     setSearchInput('');
     setSearchParams({});
   };
 
+  /**
+   * Handles explicit form search submission (Enter key or Search button click).
+   * Updates route query parameters without interrupting user typing focus.
+   */
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     const newParams = new URLSearchParams(searchParams);

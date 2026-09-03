@@ -1,0 +1,163 @@
+
+====================================================================================================
+FILE: backend\app\schemas\insights.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\schemas\insights.py
+====================================================================================================
+
+from typing import List, Optional, Dict, Any
+from decimal import Decimal
+from pydantic import BaseModel
+
+class SampleConfidence(BaseModel):
+    sample_size: int
+    confidence_level: str # VERY_LOW, LOW, MODERATE, HIGH
+    badge_label: str # e.g. "Early Data — Based on 8 owners", "High Statistical Confidence — Based on 643 owners"
+    is_authoritative: bool
+    explanation: str
+
+class MetricScore(BaseModel):
+    score: Optional[float] = None # e.g. 4.2 out of 5
+    sample_size: int = 0
+    formatted: str = "N/A"
+
+class WouldBuyAgainStats(BaseModel):
+    yes_percentage: Optional[float] = None
+    no_percentage: Optional[float] = None
+    unsure_percentage: Optional[float] = None
+    total_responses: int = 0
+    top_reasons_positive: List[str] = []
+    top_reasons_negative: List[str] = []
+
+class IssueCategoryStats(BaseModel):
+    category_slug: str
+    category_name: str
+    report_count: int
+    percentage_of_owners: float # e.g. 14.2% of owners reported battery issues
+    most_common_complaint: Optional[str] = None
+    average_occurred_month: Optional[float] = None
+    repair_required_count: int = 0
+
+class RepairIntelligence(BaseModel):
+    total_repairs_reported: int = 0
+    repair_rate_percentage: float = 0.0 # e.g. 8.5% of owners required repair
+    median_repair_cost: Optional[float] = None
+    currency: str = "INR"
+    common_parts: List[Dict[str, Any]] = [] # [{"part": "BATTERY", "count": 12}, {"part": "SCREEN", "count": 8}]
+
+class OwnershipTimelineMilestone(BaseModel):
+    tenure_bucket: str # "1-3 Months", "4-6 Months", "7-12 Months", "13-18 Months", "19-24+ Months"
+    min_months: int
+    max_months: int
+    reports_count: int
+    avg_overall_satisfaction: Optional[float] = None
+    avg_battery_satisfaction: Optional[float] = None
+    avg_performance_satisfaction: Optional[float] = None
+    avg_software_satisfaction: Optional[float] = None
+    battery_degradation_breakdown: Dict[str, float] = {} # {"NONE": 70, "MINOR": 20, "MODERATE": 10, "SEVERE": 0}
+    common_issues: List[str] = []
+
+class ProductInsightsResponse(BaseModel):
+    product_id: str
+    product_name: str
+    brand: str
+    total_registered_owners: int
+    total_experience_reports: int
+    long_term_owners_12m_plus: int
+    
+    # Confidence
+    confidence: SampleConfidence
+    
+    # Aggregate Satisfaction
+    overall_satisfaction: MetricScore
+    battery_satisfaction: MetricScore
+    performance_satisfaction: MetricScore
+    software_satisfaction: MetricScore
+    camera_satisfaction: MetricScore
+    build_satisfaction: MetricScore
+
+    # Long-term specific (12m+ only)
+    satisfaction_at_12m: MetricScore
+    
+    # Would Buy Again
+    would_buy_again: WouldBuyAgainStats
+    
+    # Issue Taxonomy & Repairs
+    issue_breakdown: List[IssueCategoryStats] = []
+    repair_stats: RepairIntelligence
+
+    # Milestone progression summary
+    tenure_summary: List[OwnershipTimelineMilestone] = []
+
+class ProductComparisonItem(BaseModel):
+    product_id: str
+    brand: str
+    model_name: str
+    release_date: Optional[str] = None
+    official_url: Optional[str] = None
+    total_owners: int
+    long_term_owners: int
+    confidence: SampleConfidence
+    overall_satisfaction: MetricScore
+    battery_satisfaction: MetricScore
+    performance_satisfaction: MetricScore
+    software_satisfaction: MetricScore
+    would_buy_again_percentage: Optional[float] = None
+    repair_rate_percentage: float = 0.0
+    median_repair_cost: Optional[float] = None
+    top_issues: List[str] = []
+    variants_summary: List[str] = []
+
+class ProductComparisonResponse(BaseModel):
+    product_a: ProductComparisonItem
+    product_b: ProductComparisonItem
+    key_takeaways: List[str] = []
+
+
+
+====================================================================================================
+FILE: backend\app\schemas\ownership.py
+FULL PATH: C:\Users\user\Desktop\WorthIt\backend\app\schemas\ownership.py
+====================================================================================================
+
+from typing import List, Optional
+from datetime import date, datetime
+from decimal import Decimal
+from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.product import ProductVariantResponse
+from app.schemas.experience import ExperienceReportResponse, ExperienceReportCreate
+
+class OwnershipCreate(BaseModel):
+    product_id: str
+    variant_id: Optional[str] = None
+    purchase_date: date
+    purchase_price: Optional[Decimal] = Field(None, example=64999.00)
+    currency: Optional[str] = "INR"
+    purchase_country: Optional[str] = "India"
+    ownership_start_date: Optional[date] = None
+    ownership_end_date: Optional[date] = None
+    status: str = "CURRENTLY_OWNING" # CURRENTLY_OWNING, PREVIOUSLY_OWNED
+    previous_phone: Optional[str] = Field(None, example="iPhone 12")
+    purchase_source: Optional[str] = Field("Online Retailer", example="Online Retailer")
+    
+    # Optional initial report to submit at the same time
+    initial_report: Optional[ExperienceReportCreate] = None
+
+class OwnershipResponse(BaseModel):
+    id: str
+    product_id: str
+    variant_id: Optional[str]
+    purchase_date: date
+    purchase_price: Optional[Decimal]
+    currency: Optional[str]
+    purchase_country: Optional[str]
+    ownership_start_date: date
+    ownership_end_date: Optional[date]
+    status: str
+    previous_phone: Optional[str]
+    purchase_source: Optional[str]
+    created_at: datetime
+    variant: Optional[ProductVariantResponse] = None
+    reports: List[ExperienceReportResponse] = []
+    model_config = ConfigDict(from_attributes=True)
+
+

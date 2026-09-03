@@ -2,7 +2,7 @@ import json
 import re
 import httpx
 import asyncio
-from decimal import Decimal
+from decimal import Decimal 
 from typing import List, Optional
 from app.providers.base import ExtractorProvider
 from app.schemas.discovery import ExtractedPhoneSpec, ExtractedVariant
