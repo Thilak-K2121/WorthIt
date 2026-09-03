@@ -344,6 +344,23 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 
 ---
 
+### 15. Case-Variant & Heterogeneous Registry Brand Duplication
+
+#### 🔴 The Problem & Browser Symptoms
+In the 17-Brand Directory on the `/products` page, duplicate brand cards began appearing in the grid (e.g. `Asus & ROG` and `Asus & ROG` rendered twice, `MicroMax` and `MicroMax` rendered twice, `Oppo` rendered twice, `Poco` rendered twice).
+
+#### 🔍 Root Cause Analysis
+1. **Heterogeneous Naming Mismatch:** Static `BRAND_REGISTRY` configured `name: 'Asus & ROG'`, while the database stored `brand: 'Asus'`.
+2. **Casing Inconsistency:** The database returned brands with mixed casing (e.g. `'POCO'` vs `'Poco'`, `'MicroMax'` vs `'Micromax'`).
+3. **Naive String Set Union:** The frontend combined static registry names with dynamic database brands using a raw string `new Set([...registryNames, ...dbBrands, ...loadedBrands])`. Because `'Asus & ROG' !== 'Asus'` and `'POCO' !== 'Poco'`, the JavaScript `Set` retained both entries, rendering duplicate cards with mismatched model counts.
+
+#### 💡 The Engineering Solution
+1. **Canonical Brand Key Normalizer (`normalizeBrandKey`):** Introduced a deterministic normalizer function that cleans whitespace and maps colloquial brand aliases (`'asus & rog'` $\rightarrow$ `'asus'`, `'1+'` $\rightarrow$ `'oneplus'`, `'moto'` $\rightarrow$ `'motorola'`).
+2. **Normalized Key-Value Map:** Replaced the naive `Set` with a `Map<canonicalKey, displayName>`. All static registry entries, database brands, and loaded product brands pass through `normalizeBrandKey()`, ensuring each unique brand family occupies exactly one card.
+3. **Normalized Count & Filter Binding:** Updated the `brandDeviceCount` filter and `handleSelectBrand()` to compare normalized keys, ensuring accurate model counts (e.g. `Asus (4 Models Tracked)`) across the directory.
+
+---
+
 ## 🎯 Summary Table for Interview Discussion
 
 | Technical Challenge | Root Cause | Engineering Solution | Key Takeaway |
@@ -361,6 +378,7 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 | **Favicon Tab Cache Stagnation** | Chrome/Edge aggressively caching disk favicons | Added version query params (`?v=2`) and multi-rel icon tags | Use versioned asset URLs to force instant client cache invalidation on static deploys. |
 | **N+1 SQL Latency Explosion** | 300+ remote SQL queries per page request in loop | Replaced loop queries with 2 bulk `GROUP BY` aggregations + `joinedload` | Prevent N+1 queries by aggregating multi-model metrics in single batch queries (~1,500x speedup). |
 | **Keystroke Hijacking & Desync** | Direct `onChange` mutating URL search params without input buffering | Buffered search state locally with form submit handler & clean filter reset | Buffer user text input in component state before committing changes to route search params. |
+| **Brand Grid Duplication** | Naive string `Set` combining case-variant and static vs dynamic brand names | Canonical `normalizeBrandKey` with `Map<canonicalKey, displayName>` | Always canonicalize and normalize key representations before deduplicating dataset collections. |
 | **Zero-Cost Evaluability** | External dependencies required for tests | Provider Pattern with deterministic Mock Providers | Decouple core domain logic from third-party vendor APIs for reliable CI/CD. |
 
 ---
@@ -370,7 +388,7 @@ Navigating to the smartphone catalog (`/products` or `/submit`) took **over 60 s
 - ✅ **AI Pipeline:** Live Tavily Web Search + Google Gemini 3.5 Flash-Lite schema extraction.
 - ✅ **Frontend:** Responsive React + Vite application with clean LexiGuard light theme, 17-brand catalog directory with 98 famous smartphones, 3-step review wizard, and side-by-side comparison engine.
 - ✅ **Deployment:** Fully deployed on **Render Web Services + Render Static Site + Supabase PostgreSQL** with automated boot seeding.
-- ✅ **Performance & UX:** Search typing without focus interruption, 1-click filter resets, and **40ms catalog load speeds**.
+- ✅ **Performance & UX:** Search typing without focus interruption, 1-click filter resets, deduplicated brand registry, and **40ms catalog load speeds**.
 
 
 

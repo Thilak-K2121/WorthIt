@@ -139,7 +139,7 @@ const BRAND_REGISTRY = {
     bg: 'bg-slate-100'
   },
   'asus': {
-    name: 'Asus & ROG',
+    name: 'Asus',
     title: 'Asus ROG & Zenfone Series',
     tagline: 'Hardcore mobile gaming cooling, AirTriggers & compact ergonomic flagships.',
     highlights: ['AirTrigger Ultrasonic', 'GameCool 8 Thermal', '6000mAh Battery'],
@@ -178,6 +178,16 @@ const BRAND_REGISTRY = {
     color: 'text-cyan-600',
     bg: 'bg-cyan-50'
   },
+  'lava': {
+    name: 'Lava',
+    title: 'Lava Agni & Blaze Series',
+    tagline: 'Clean bloatware-free Android, curved AMOLED displays & indigenous Indian engineering.',
+    highlights: ['Free Service at Home', 'Clean Android 14', 'Dimensity 7050 Power'],
+    anticipatedModels: ['Lava Agni 3', 'Lava Agni 2 5G', 'Lava Blaze Curve 5G'],
+    icon: ShieldCheck,
+    color: 'text-emerald-700',
+    bg: 'bg-emerald-50'
+  },
   'micromax': {
     name: 'MicroMax',
     title: 'MicroMax Series',
@@ -188,6 +198,19 @@ const BRAND_REGISTRY = {
     color: 'text-amber-600',
     bg: 'bg-amber-50'
   }
+};
+
+/**
+ * Normalizes any raw brand string to a canonical dictionary lookup key.
+ */
+const normalizeBrandKey = (brandStr) => {
+  if (!brandStr) return '';
+  const clean = brandStr.toLowerCase().trim();
+  if (clean === 'asus & rog' || clean === 'rog') return 'asus';
+  if (clean === '1+' || clean === 'one plus') return 'oneplus';
+  if (clean === 'moto') return 'motorola';
+  if (clean === 'mi' || clean === 'redmi') return 'xiaomi';
+  return clean;
 };
 
 export default function ProductListPage() {
@@ -230,23 +253,40 @@ export default function ProductListPage() {
     fetchCatalog();
   }, [selectedBrand, searchParam]);
 
-  // Combine static registry brands, distinct database brands, and loaded product brands
-  const loadedProductBrands = products.map(p => p.brand).filter(Boolean);
-  const combinedBrandSet = new Set([
-    ...Object.keys(BRAND_REGISTRY).map(k => BRAND_REGISTRY[k].name),
-    ...dbBrands,
-    ...loadedProductBrands
-  ]);
-  const allBrands = Array.from(combinedBrandSet).sort((a, b) => a.localeCompare(b));
+  // Robust Case-Insensitive Brand Deduplication Engine
+  const brandMap = new Map();
+  // 1. Static curated registry brands
+  Object.keys(BRAND_REGISTRY).forEach(k => {
+    brandMap.set(k, BRAND_REGISTRY[k].name);
+  });
+  // 2. Distinct database brands (case-insensitively deduplicated)
+  dbBrands.forEach(b => {
+    const key = normalizeBrandKey(b);
+    if (!brandMap.has(key)) {
+      brandMap.set(key, b.charAt(0).toUpperCase() + b.slice(1));
+    }
+  });
+  // 3. Loaded product brands
+  products.forEach(p => {
+    if (p.brand) {
+      const key = normalizeBrandKey(p.brand);
+      if (!brandMap.has(key)) {
+        brandMap.set(key, p.brand.charAt(0).toUpperCase() + p.brand.slice(1));
+      }
+    }
+  });
+
+  const allBrands = Array.from(brandMap.values()).sort((a, b) => a.localeCompare(b));
 
   const getBrandMeta = (brandName) => {
-    const key = (brandName || '').toLowerCase();
+    const key = normalizeBrandKey(brandName);
     if (BRAND_REGISTRY[key]) {
       return BRAND_REGISTRY[key];
     }
     return {
       name: brandName,
       title: `${brandName} Series`,
+      tagline: `${brandName} smartphone lineup tracking multi-year battery health and verified owner sentiment.`,
       highlights: ['Long-Term Reliability', 'Battery Health Tracking', 'Owner Repurchase Rate'],
       anticipatedModels: [`${brandName} Flagship`, `${brandName} Pro`, `${brandName} Lite`],
       icon: Smartphone,
@@ -358,14 +398,15 @@ export default function ProductListPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {allBrands.map((bName, idx) => {
+                const brandKey = normalizeBrandKey(bName);
                 const meta = getBrandMeta(bName);
                 const Icon = meta.icon;
-                const brandDeviceCount = products.filter(p => p.brand.toLowerCase() === bName.toLowerCase()).length;
+                const brandDeviceCount = products.filter(p => normalizeBrandKey(p.brand) === brandKey).length;
 
                 return (
                   <button
                     key={bName}
-                    onClick={() => handleSelectBrand(bName)}
+                    onClick={() => handleSelectBrand(meta.name)}
                     style={{ animationDelay: `${idx * 0.045}s` }}
                     className="bg-white rounded-3xl p-7 lexi-card text-left flex flex-col justify-between group hover:border-[#00D09C] transition-all stagger-card"
                   >
