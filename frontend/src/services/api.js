@@ -77,6 +77,11 @@ export const api = {
   },
 
   /**
+   * Fetches distinct list of all active brand names in catalog.
+   */
+  getBrands: () => fetchJson('/products/brands'),
+
+  /**
    * Retrieves single smartphone specifications and hardware variants.
    * @param {string} id - Product UUID.
    */

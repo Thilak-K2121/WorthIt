@@ -177,12 +177,23 @@ const BRAND_REGISTRY = {
     icon: Sparkles,
     color: 'text-cyan-600',
     bg: 'bg-cyan-50'
+  },
+  'micromax': {
+    name: 'MicroMax',
+    title: 'MicroMax Series',
+    tagline: 'Affordable Indian smartphone lineup focused on everyday value and battery longevity.',
+    highlights: ['Budget Battery Life', 'Clean Stock Android', 'Everyday Durability'],
+    anticipatedModels: ['MicroMax Q381', 'MicroMax IN Note 2', 'MicroMax IN 2b'],
+    icon: Smartphone,
+    color: 'text-amber-600',
+    bg: 'bg-amber-50'
   }
 };
 
 export default function ProductListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState([]);
+  const [dbBrands, setDbBrands] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const selectedBrand = searchParams.get('brand') || '';
@@ -198,12 +209,18 @@ export default function ProductListPage() {
     async function fetchCatalog() {
       setLoading(true);
       try {
-        const res = await api.getProducts({
-          search: searchParam || undefined,
-          brand: selectedBrand || undefined,
-          page_size: 50
-        });
-        setProducts(res.items || []);
+        const [productsRes, brandsRes] = await Promise.all([
+          api.getProducts({
+            search: searchParam || undefined,
+            brand: selectedBrand || undefined,
+            page_size: 500
+          }),
+          api.getBrands().catch(() => [])
+        ]);
+        setProducts(productsRes.items || []);
+        if (Array.isArray(brandsRes)) {
+          setDbBrands(brandsRes);
+        }
       } catch (err) {
         console.error('Error loading products:', err);
       } finally {
@@ -213,11 +230,14 @@ export default function ProductListPage() {
     fetchCatalog();
   }, [selectedBrand, searchParam]);
 
-  const uniqueBrands = Array.from(new Set(products.map(p => p.brand).filter(Boolean)));
-  const allBrands = [
+  // Combine static registry brands, distinct database brands, and loaded product brands
+  const loadedProductBrands = products.map(p => p.brand).filter(Boolean);
+  const combinedBrandSet = new Set([
     ...Object.keys(BRAND_REGISTRY).map(k => BRAND_REGISTRY[k].name),
-    ...uniqueBrands.filter(b => !Object.keys(BRAND_REGISTRY).some(k => k.toLowerCase() === b.toLowerCase()))
-  ];
+    ...dbBrands,
+    ...loadedProductBrands
+  ]);
+  const allBrands = Array.from(combinedBrandSet).sort((a, b) => a.localeCompare(b));
 
   const getBrandMeta = (brandName) => {
     const key = (brandName || '').toLowerCase();
@@ -227,7 +247,6 @@ export default function ProductListPage() {
     return {
       name: brandName,
       title: `${brandName} Series`,
-      tagline: `${brandName} smartphones tracking real-world battery endurance and longevity.`,
       highlights: ['Long-Term Reliability', 'Battery Health Tracking', 'Owner Repurchase Rate'],
       anticipatedModels: [`${brandName} Flagship`, `${brandName} Pro`, `${brandName} Lite`],
       icon: Smartphone,

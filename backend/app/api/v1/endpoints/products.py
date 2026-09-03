@@ -10,9 +10,24 @@ from app.schemas.product import (
     ProductVariantResponse
 )
 from app.schemas.common import PaginatedResponse
+from app.models.product import Product
 from app.services.product_service import ProductService
 
 router = APIRouter()
+
+@router.get("/brands", response_model=List[str])
+def list_brands(db: Session = Depends(get_db)):
+    """
+    Returns a distinct list of all active smartphone brand names in the catalog.
+    """
+    brands = (
+        db.query(Product.brand)
+        .filter(Product.status == "ACTIVE")
+        .distinct()
+        .order_by(Product.brand.asc())
+        .all()
+    )
+    return [b[0] for b in brands if b[0]]
 
 @router.get("", response_model=PaginatedResponse[ProductSummaryResponse])
 def list_products(
@@ -22,7 +37,7 @@ def list_products(
     status: Optional[str] = Query("ACTIVE", description="Product status filter"),
     sort_by: str = Query("popularity", description="Sort by: popularity, satisfaction, release_date, long_term_owners"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100)
+    page_size: int = Query(20, ge=1, le=500)
 ):
     skip = (page - 1) * page_size
     items, total = ProductService.list_products(

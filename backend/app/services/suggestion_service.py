@@ -61,6 +61,26 @@ class SuggestionService:
             db.add(new_product)
             db.flush()
 
+            # Create default hardware variant from user details if provided
+            ram_val = "8GB"
+            storage_val = "128GB"
+            if suggestion.variant_details:
+                parts = [p.strip() for p in suggestion.variant_details.split("/") if p.strip()]
+                if len(parts) >= 1:
+                    ram_val = parts[0]
+                if len(parts) >= 2:
+                    storage_val = parts[1]
+
+            variant = ProductVariant(
+                product_id=new_product.id,
+                ram=ram_val,
+                storage=storage_val,
+                chipset="Standard Processor",
+                launch_price=0,
+                currency="INR"
+            )
+            db.add(variant)
+
             suggestion.status = "APPROVED"
             suggestion.target_product_id = new_product.id
         elif review.action == "MARK_DUPLICATE":
