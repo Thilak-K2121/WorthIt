@@ -54,6 +54,36 @@
 
   <!-- ===================================================================== -->
   <section>
+    <h2>2026-11-17 (update 2) · Admin can edit phone names; deploy fix</h2>
+    <div class="meta">
+      <span class="tag add">Added</span><span class="tag fix">Fixed</span>
+    </div>
+
+    <h3>Added: edit names before and after publishing</h3>
+    <ul>
+      <li><strong>User suggestions:</strong> each pending suggestion in the queue now has editable Brand, Model and Variant fields, prefilled with what the user typed.
+        "Approve with edits" publishes the corrected name, and the card shows the original submission for reference.</li>
+      <li><strong>Any phone, any time:</strong> the Catalog Manager list has an <strong>Edit</strong> button on every row, whether the phone was AI-discovered, user-suggested or added by hand. It renames the phone in place.
+        Approved suggestion cards link there via "Rename in Catalog Manager".</li>
+      <li>New endpoint <code>PATCH /api/v1/admin/products/{id}</code> (brand and/or model). It keeps the dedup key and the search name in sync and clears the cache, so the new name shows everywhere at once.
+        Variants, owner reports and history are untouched.</li>
+      <li><strong>Duplicate protection:</strong> a rename or approval that would collide with a different existing phone is refused with a clear message (HTTP 409). A phone can be "renamed" to its own name.</li>
+    </ul>
+
+    <h3>Fixed</h3>
+    <ul>
+      <li>Approving a suggestion whose name already existed crashed with a database error (HTTP 500). It now returns a clear 409, and the suggestion stays pending so it can be corrected.</li>
+      <li><strong>Security:</strong> approving or rejecting suggestions was open to anyone, and approval can now also rename. It now requires the admin key, like the other catalog actions.</li>
+      <li><strong>Deploy crash</strong> <code>ModuleNotFoundError: No module named 'psycopg'</code>: the Render <code>DATABASE_URL</code> used the <code>postgresql+psycopg://</code> scheme while only psycopg2 is installed.
+        <code>database.py</code> now normalizes every PostgreSQL URL form to the installed driver.</li>
+    </ul>
+
+    <h3>Tests</h3>
+    <ul><li>8 new tests (rename, partial rename, self-rename, collision, approve-with-edits then rename again, duplicate approval, admin key). Full suite: <strong>41 passed</strong>.</li></ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section>
     <h2>2026-11-17 (update) · In-memory cache, unused-column cleanup</h2>
     <div class="meta">
       <span class="tag add">Added</span><span class="tag fix">Changed</span><span class="tag rm">Removed</span>

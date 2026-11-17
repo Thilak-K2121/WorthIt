@@ -106,7 +106,7 @@ class DeduplicationService:
         return combined
 
     @classmethod
-    def find_existing_duplicate(cls, db: Session, brand: str, model_name: str) -> Tuple[Optional[Product], float]:
+    def find_existing_duplicate(cls, db: Session, brand: str, model_name: str, exclude_id: Optional[str] = None) -> Tuple[Optional[Product], float]:
         """
         Searches the database for potential duplicate products using a 2-tier check:
         1. Exact normalized_name slug match (1.0 confidence).
@@ -116,6 +116,7 @@ class DeduplicationService:
             db: SQLAlchemy session.
             brand: Brand name.
             model_name: Model title.
+            exclude_id: Product id to ignore (used when renaming that product).
             
         Returns:
             Tuple of (Matched Product model or None, confidence float score 0.0 - 1.0).
@@ -123,13 +124,19 @@ class DeduplicationService:
         norm_key = cls.generate_normalized_key(brand, model_name)
 
         # 1. Tier 1: Exact normalized key match
-        exact_match = db.query(Product).filter(Product.normalized_name == norm_key).first()
+        exact_q = db.query(Product).filter(Product.normalized_name == norm_key)
+        if exclude_id:
+            exact_q = exact_q.filter(Product.id != exclude_id)
+        exact_match = exact_q.first()
         if exact_match:
             return exact_match, 1.0
 
         # 2. Tier 2: Token-set Jaccard comparison across all candidates of the same brand
         canonical_brand = cls.normalize_brand(brand)
-        candidates = db.query(Product).filter(Product.brand.ilike(canonical_brand)).all()
+        cand_q = db.query(Product).filter(Product.brand.ilike(canonical_brand))
+        if exclude_id:
+            cand_q = cand_q.filter(Product.id != exclude_id)
+        candidates = cand_q.all()
         
         target_tokens = set(norm_key.split("-"))
         # Exclude brand token from similarity score calculation

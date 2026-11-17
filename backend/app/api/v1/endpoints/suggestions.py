@@ -1,14 +1,14 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, require_admin
 from app.core.cache import invalidate_catalog_cache
 from app.schemas.suggestion import (
     ProductSuggestionCreate,
     ProductSuggestionResponse,
     ProductSuggestionReview
 )
-from app.services.suggestion_service import SuggestionService
+from app.services.suggestion_service import SuggestionService, DuplicateProductError
 
 router = APIRouter()
 
@@ -29,13 +29,17 @@ def list_suggestions(
     skip = (page - 1) * page_size
     return SuggestionService.list_suggestions(db, status=status, skip=skip, limit=page_size)
 
-@router.post("/{suggestion_id}/review", response_model=ProductSuggestionResponse)
+@router.post("/{suggestion_id}/review", response_model=ProductSuggestionResponse, dependencies=[Depends(require_admin)])
 def review_suggestion(
     suggestion_id: str,
     review_in: ProductSuggestionReview,
     db: Session = Depends(get_db)
 ):
-    updated = SuggestionService.review_suggestion(db, suggestion_id, review_in)
+    """Admin-only: approve (optionally with corrected brand/model/variant), reject, or mark duplicate."""
+    try:
+        updated = SuggestionService.review_suggestion(db, suggestion_id, review_in)
+    except DuplicateProductError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not updated:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     invalidate_catalog_cache("suggestion reviewed")

@@ -183,11 +183,13 @@ export const api = {
   },
 
   /**
-   * Approves or rejects a community suggestion.
+   * Approves (optionally with corrected brand/model/variant_details), rejects, or
+   * marks a community suggestion as duplicate. Admin key required.
    */
   reviewSuggestion: (suggestionId, reviewData) =>
     fetchJson(`/product-suggestions/${suggestionId}/review`, {
       method: 'POST',
+      headers: adminHeaders(),
       body: JSON.stringify(reviewData),
     }),
 
@@ -229,6 +231,14 @@ export const api = {
       method: 'POST',
       headers: adminHeaders(),
       body: JSON.stringify(productData),
+    }),
+
+  /** Corrects a phone's brand and/or model name. */
+  adminRenameProduct: (productId, { brand, model_name }) =>
+    fetchJson(`/admin/products/${productId}`, {
+      method: 'PATCH',
+      headers: adminHeaders(),
+      body: JSON.stringify({ brand, model_name }),
     }),
 
   /** Permanently deletes a phone and its variants, sources and owner reports. */

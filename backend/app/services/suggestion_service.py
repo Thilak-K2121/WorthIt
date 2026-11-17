@@ -5,6 +5,10 @@ from app.models.product import Product, ProductVariant
 from app.schemas.suggestion import ProductSuggestionCreate, ProductSuggestionReview
 from app.services.deduplication_service import DeduplicationService
 
+class DuplicateProductError(ValueError):
+    """Raised when an approved/renamed name collides with an existing catalog entry."""
+
+
 class SuggestionService:
     @staticmethod
     def create_suggestion(db: Session, suggestion_in: ProductSuggestionCreate) -> ProductSuggestion:
@@ -41,6 +45,22 @@ class SuggestionService:
             return None
 
         if review.action == "APPROVE":
+            # Apply the admin's corrections first, so the suggestion record matches what was published
+            if review.brand is not None and review.brand.strip():
+                suggestion.brand = DeduplicationService.normalize_brand(review.brand)
+            if review.model_name is not None and review.model_name.strip():
+                suggestion.model_name = review.model_name.strip()
+            if review.variant_details is not None:
+                suggestion.variant_details = review.variant_details.strip() or None
+
+            existing, _ = DeduplicationService.find_existing_duplicate(db, suggestion.brand, suggestion.model_name)
+            if existing:
+                db.rollback()
+                raise DuplicateProductError(
+                    f"'{existing.brand} {existing.model_name}' is already in the catalog. "
+                    "Edit the name, or mark this suggestion as a duplicate."
+                )
+
             # Promote to full product catalog
             canonical_brand = DeduplicationService.normalize_brand(suggestion.brand)
             norm_key = DeduplicationService.generate_normalized_key(canonical_brand, suggestion.model_name)

@@ -41,6 +41,11 @@ class ProductUpdate(BaseModel):
     status: Optional[str] = None
     description: Optional[str] = None
 
+class AdminProductRename(BaseModel):
+    """Admin correction of a catalog entry's name. Omitted fields stay unchanged."""
+    brand: Optional[str] = Field(None, example="Samsung")
+    model_name: Optional[str] = Field(None, example="Galaxy S25 Ultra")
+
 class ProductSourceResponse(BaseModel):
     id: str
     source_url: str

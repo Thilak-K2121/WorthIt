@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  KeyRound, Lock, Unlock, Plus, Trash2, Search, Database, RefreshCw, Smartphone, X, Zap, AlertTriangle,
+  KeyRound, Lock, Unlock, Plus, Trash2, Search, Database, RefreshCw, Smartphone, X, Zap, AlertTriangle, Pencil, Check,
 } from 'lucide-react';
 import { api, getAdminKey, setAdminKey } from '../../services/api';
 
@@ -360,30 +360,16 @@ export default function CatalogManager({ onCatalogChanged }) {
               <p className="text-xs text-slate-400 p-4 text-center">No phones match.</p>
             )}
             {products.map((p) => (
-              <div key={p.id} className="flex items-center justify-between gap-3 px-2 py-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{p.brand}</span>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${SOURCE_STYLES[p.discovery_source] || SOURCE_STYLES.MANUAL}`}>
-                      {p.discovery_source === 'AUTOMATED' ? 'AI discovered' : p.discovery_source.replace('_', ' ').toLowerCase()}
-                    </span>
-                  </div>
-                  <Link to={`/products/${p.id}`} className="text-sm font-bold text-slate-900 hover:text-emerald-700 truncate block">
-                    {p.model_name}
-                  </Link>
-                  <span className="text-[11px] text-slate-400">
-                    {p.release_date || 'No release date'} · {p.variant_count} variant(s) · {p.total_owners_count} owner(s)
-                  </span>
-                </div>
-                <button
-                  onClick={() => handleDelete(p)}
-                  disabled={deletingId === p.id}
-                  className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-700 text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>{deletingId === p.id ? 'Deleting…' : 'Delete'}</span>
-                </button>
-              </div>
+              <CatalogRow
+                key={p.id}
+                product={p}
+                deleting={deletingId === p.id}
+                onDelete={() => handleDelete(p)}
+                onRenamed={(updated) => {
+                  setProducts((list) => list.map((x) => (x.id === updated.id ? { ...x, brand: updated.brand, model_name: updated.model_name } : x)));
+                  onCatalogChanged?.();
+                }}
+              />
             ))}
           </div>
 
@@ -394,6 +380,101 @@ export default function CatalogManager({ onCatalogChanged }) {
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CatalogRow({ product: p, deleting, onDelete, onRenamed }) {
+  const [editing, setEditing] = useState(false);
+  const [brand, setBrand] = useState(p.brand);
+  const [model, setModel] = useState(p.model_name);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const startEdit = () => {
+    setBrand(p.brand);
+    setModel(p.model_name);
+    setError('');
+    setEditing(true);
+  };
+
+  const save = async (e) => {
+    e.preventDefault();
+    if (brand.trim() === p.brand && model.trim() === p.model_name) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const updated = await api.adminRenameProduct(p.id, { brand: brand.trim(), model_name: model.trim() });
+      onRenamed(updated);
+      setEditing(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="px-2 py-3 space-y-2 bg-emerald-50/40 rounded-xl">
+        <div className="grid grid-cols-[1fr_2fr] gap-2">
+          <input aria-label="Brand" value={brand} onChange={(e) => setBrand(e.target.value)} className={inputCls} autoFocus />
+          <input aria-label="Model name" value={model} onChange={(e) => setModel(e.target.value)} className={inputCls} />
+        </div>
+        {error && <p className="text-xs font-semibold text-rose-700">{error}</p>}
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !brand.trim() || !model.trim()}
+            className="px-3 py-1.5 rounded-xl btn-lexi-mint text-xs font-bold flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <Check className="w-3.5 h-3.5" />
+            {saving ? 'Saving…' : 'Save name'}
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-2 py-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700">{p.brand}</span>
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border ${SOURCE_STYLES[p.discovery_source] || SOURCE_STYLES.MANUAL}`}>
+            {p.discovery_source === 'AUTOMATED' ? 'AI discovered' : p.discovery_source.replace('_', ' ').toLowerCase()}
+          </span>
+        </div>
+        <Link to={`/products/${p.id}`} className="text-sm font-bold text-slate-900 hover:text-emerald-700 truncate block">
+          {p.model_name}
+        </Link>
+        <span className="text-[11px] text-slate-400">
+          {p.release_date || 'No release date'} · {p.variant_count} variant(s) · {p.total_owners_count} owner(s)
+        </span>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={startEdit}
+          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-200 text-slate-500 hover:text-emerald-700 text-xs font-bold flex items-center gap-1.5 transition-colors"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+          <span>Edit</span>
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={deleting}
+          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-500 hover:text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>{deleting ? 'Deleting…' : 'Delete'}</span>
+        </button>
       </div>
     </div>
   );

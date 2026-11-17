@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 import CatalogManager from '../components/admin/CatalogManager';
+import SuggestionReviewCard from '../components/admin/SuggestionReviewCard';
 
 const DISCOVERY_STAGES = [
   {
@@ -160,13 +161,17 @@ export default function AdminDiscoveryPage() {
     }
   };
 
-  const handleReviewSuggestion = async (id, action) => {
+  // Errors propagate to the card, which shows them inline (e.g. duplicate name, missing admin key)
+  const handleReviewSuggestion = async (id, review) => {
     try {
-      await api.reviewSuggestion(id, { action });
-      await refreshData();
+      await api.reviewSuggestion(id, review);
     } catch (err) {
-      alert(`Review failed: ${err.message}`);
+      if (/admin key|not configured/i.test(err.message)) {
+        throw new Error(`${err.message} Unlock the Catalog Manager tab with your admin key first.`);
+      }
+      throw err;
     }
+    await refreshData();
   };
 
   const handleDeleteDiscovered = async (productId, label) => {
@@ -628,53 +633,12 @@ export default function AdminDiscoveryPage() {
           {suggestions.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {suggestions.map(s => (
-                <div key={s.id} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs uppercase font-extrabold text-emerald-700">{s.brand}</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                        s.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                        s.status === 'PENDING' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
-                        'bg-slate-100 text-slate-600'
-                      }`}>
-                        {s.status}
-                      </span>
-                    </div>
-
-                    <h4 className="text-xl font-black text-slate-900">{s.model_name}</h4>
-
-                    {s.variant_details && (
-                      <p className="text-xs text-slate-600 font-medium">Variant: {s.variant_details}</p>
-                    )}
-                    {s.notes && (
-                      <p className="text-xs text-slate-500 italic bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                        "{s.notes}"
-                      </p>
-                    )}
-                  </div>
-
-                  {s.status === 'PENDING' ? (
-                    <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
-                      <button
-                        onClick={() => handleReviewSuggestion(s.id, 'APPROVE')}
-                        className="flex-1 py-2.5 rounded-xl btn-lexi-mint text-xs font-bold flex items-center justify-center gap-1.5"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Approve & Ingest</span>
-                      </button>
-                      <button
-                        onClick={() => handleReviewSuggestion(s.id, 'REJECT')}
-                        className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="pt-2 border-t border-slate-100 text-xs text-slate-400 font-medium">
-                      Reviewed & processed in catalog
-                    </div>
-                  )}
-                </div>
+                <SuggestionReviewCard
+                  key={`${s.id}-${s.status}`}
+                  suggestion={s}
+                  onReview={handleReviewSuggestion}
+                  onOpenCatalogManager={() => setActiveTab('catalog')}
+                />
               ))}
             </div>
           ) : (

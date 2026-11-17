@@ -13,6 +13,10 @@ class ProductSuggestionReview(BaseModel):
     action: str = Field(..., example="APPROVE") # APPROVE, REJECT, MARK_DUPLICATE
     target_product_id: Optional[str] = None
     rejection_reason: Optional[str] = None
+    # Optional admin corrections applied before APPROVE (e.g. fix a user's typo)
+    brand: Optional[str] = Field(None, example="Nothing")
+    model_name: Optional[str] = Field(None, example="Phone (3)")
+    variant_details: Optional[str] = Field(None, example="12GB / 256GB")
 
 class ProductSuggestionResponse(BaseModel):
     id: str

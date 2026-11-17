@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, require_admin
 from app.core.cache import cache, invalidate_catalog_cache
 from app.models.product import Product
-from app.schemas.product import ProductCreate, ProductDetailResponse
+from app.schemas.product import AdminProductRename, ProductCreate, ProductDetailResponse
 from app.services.deduplication_service import DeduplicationService
 from app.services.product_service import ProductService
 from app.api.v1.endpoints.products import build_product_detail
@@ -48,6 +48,41 @@ def admin_create_product(product_in: ProductCreate, db: Session = Depends(get_db
 
     invalidate_catalog_cache("admin created product")
     return build_product_detail(db, created.id)
+
+
+@router.patch("/products/{product_id}", response_model=ProductDetailResponse)
+def admin_rename_product(product_id: str, rename: AdminProductRename, db: Session = Depends(get_db)):
+    """
+    Corrects a catalog entry's brand and/or model name at any time (AI-discovered,
+    user-suggested or manual). Keeps the dedup key and search name in sync, and
+    refuses a name that collides with a different existing phone.
+    """
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    new_brand = DeduplicationService.normalize_brand(rename.brand) if rename.brand and rename.brand.strip() else product.brand
+    new_model = rename.model_name.strip() if rename.model_name and rename.model_name.strip() else product.model_name
+
+    existing, score = DeduplicationService.find_existing_duplicate(db, new_brand, new_model, exclude_id=product.id)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"'{existing.brand} {existing.model_name}' already exists in the catalog (similarity {score:.2f}).",
+        )
+
+    product.brand = new_brand
+    product.model_name = new_model
+    product.normalized_name = DeduplicationService.generate_normalized_key(new_brand, new_model)
+    product.official_name = f"{new_brand} {new_model}"  # used by catalog search; keep it in step
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Another product already uses this name.")
+
+    invalidate_catalog_cache("admin renamed product")
+    return build_product_detail(db, product.id)
 
 
 @router.delete("/products/{product_id}")
