@@ -2,10 +2,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 from app.core.config import settings
 
-# Normalize postgres:// to postgresql:// for SQLAlchemy 2.0
-db_url = settings.DATABASE_URL
-if db_url.startswith("postgres://"):
-    db_url = db_url.replace("postgres://", "postgresql://", 1)
+# Normalize any PostgreSQL URL form (postgres://, postgresql://, postgresql+psycopg://, ...)
+# to the psycopg2 driver, which is the one installed via requirements.txt.
+# Without this, e.g. a "postgresql+psycopg://" URL crashes startup with "No module named 'psycopg'".
+db_url = settings.DATABASE_URL.strip()
+_scheme, _sep, _rest = db_url.partition("://")
+if _sep and _scheme.split("+", 1)[0] in ("postgres", "postgresql"):
+    db_url = f"postgresql+psycopg2://{_rest}"
 
 # Configure SQLite vs PostgreSQL parameters
 connect_args = {}
