@@ -38,6 +38,19 @@ class RepairIntelligence(BaseModel):
     currency: str = "INR"
     common_parts: List[Dict[str, Any]] = [] # [{"part": "BATTERY", "count": 12}, {"part": "SCREEN", "count": 8}]
 
+class PricePaidStats(BaseModel):
+    """What owners report actually paying, vs the official launch price of the variant they bought."""
+    sample_size: int = 0
+    average_paid: Optional[float] = None
+    median_paid: Optional[float] = None
+    min_paid: Optional[float] = None
+    max_paid: Optional[float] = None
+    currency: str = "INR"
+    # Mean of (paid - launch) / launch over owners whose variant has a launch price.
+    # Negative = owners paid below launch price on average.
+    avg_vs_launch_percentage: Optional[float] = None
+    launch_comparison_sample_size: int = 0
+
 class OwnershipTimelineMilestone(BaseModel):
     tenure_bucket: str # "1-3 Months", "4-6 Months", "7-12 Months", "13-18 Months", "19-24+ Months"
     min_months: int
@@ -67,7 +80,6 @@ class ProductInsightsResponse(BaseModel):
     performance_satisfaction: MetricScore
     software_satisfaction: MetricScore
     camera_satisfaction: MetricScore
-    build_satisfaction: MetricScore
 
     # Long-term specific (12m+ only)
     satisfaction_at_12m: MetricScore
@@ -78,6 +90,7 @@ class ProductInsightsResponse(BaseModel):
     # Issue Taxonomy & Repairs
     issue_breakdown: List[IssueCategoryStats] = []
     repair_stats: RepairIntelligence
+    price_paid: PricePaidStats = PricePaidStats()
 
     # Milestone progression summary
     tenure_summary: List[OwnershipTimelineMilestone] = []

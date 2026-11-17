@@ -23,12 +23,13 @@ const API_BASE_URL = RAW_BASE_URL.replace(/\/+$/, '');
  * @returns {Promise<any>} Parsed JSON response.
  */
 async function fetchJson(url, options = {}) {
+  // Spread options first so the merged headers below are not overwritten by options.headers
   const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
-    ...options,
   });
 
   if (!response.ok) {
@@ -214,4 +215,60 @@ export const api = {
    * Fetches full audit details for a specific discovery run.
    */
   getDiscoveryRun: (id) => fetchJson(`/discovery/runs/${id}`),
+
+  // ----------------------------------------------------------------------------
+  // Admin Catalog Management (requires X-Admin-Key)
+  // ----------------------------------------------------------------------------
+
+  /** Validates an admin key against the backend. */
+  verifyAdminKey: (key) => fetchJson('/admin/verify', { headers: { 'X-Admin-Key': key } }),
+
+  /** Manually adds a phone (with optional variants) to the catalog. */
+  adminCreateProduct: (productData) =>
+    fetchJson('/admin/products', {
+      method: 'POST',
+      headers: adminHeaders(),
+      body: JSON.stringify(productData),
+    }),
+
+  /** Permanently deletes a phone and its variants, sources and owner reports. */
+  adminDeleteProduct: (productId) =>
+    fetchJson(`/admin/products/${productId}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
+    }),
+
+  /** Redis cache connectivity and hit/miss stats. */
+  adminCacheStats: () => fetchJson('/admin/cache/stats', { headers: adminHeaders() }),
+
+  /** Clears all cached API responses. */
+  adminFlushCache: () =>
+    fetchJson('/admin/cache/flush', { method: 'POST', headers: adminHeaders() }),
 };
+
+// ------------------------------------------------------------------------------
+// Admin key storage (per-browser; the key itself is validated server-side)
+// ------------------------------------------------------------------------------
+const ADMIN_KEY_STORAGE = 'worthit_admin_key';
+
+export function getAdminKey() {
+  try {
+    return localStorage.getItem(ADMIN_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function setAdminKey(key) {
+  try {
+    if (key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
+    else localStorage.removeItem(ADMIN_KEY_STORAGE);
+  } catch {
+    /* storage unavailable: key lives only for this page view */
+  }
+}
+
+function adminHeaders() {
+  const key = getAdminKey();
+  return key ? { 'X-Admin-Key': key } : {};
+}

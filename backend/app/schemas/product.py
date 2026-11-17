@@ -28,7 +28,6 @@ class ProductBase(BaseModel):
     official_url: Optional[str] = None
     status: str = "ACTIVE"
     discovery_source: str = "MANUAL"
-    verification_status: str = "VERIFIED"
     description: Optional[str] = None
 
 class ProductCreate(ProductBase):
@@ -40,14 +39,11 @@ class ProductUpdate(BaseModel):
     country_market: Optional[str] = None
     official_url: Optional[str] = None
     status: Optional[str] = None
-    verification_status: Optional[str] = None
     description: Optional[str] = None
 
 class ProductSourceResponse(BaseModel):
     id: str
     source_url: str
-    source_title: Optional[str] = None
-    source_snippet: Optional[str] = None
     provider: str
     discovered_at: datetime
     model_config = ConfigDict(from_attributes=True)

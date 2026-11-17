@@ -7,13 +7,15 @@
 # ==============================================================================
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import time
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base, SessionLocal
 from app.api.v1.api import api_router
 from app.models.issue import IssueCategory
 from app.core.logging import logger
+from app.core.cache import cache
 
 def seed_initial_issue_categories():
     """
@@ -43,7 +45,7 @@ def seed_initial_issue_categories():
         for slug, name, desc in categories:
             exists = db.query(IssueCategory).filter(IssueCategory.slug == slug).first()
             if not exists:
-                cat = IssueCategory(slug=slug, display_name=name, description=desc)
+                cat = IssueCategory(slug=slug, display_name=name)
                 db.add(cat)
         db.commit()
     except Exception as e:
@@ -64,12 +66,21 @@ async def lifespan(app: FastAPI):
     logger.info("Initializing WorthIt Platform Backend...")
     # Auto-create tables for local/testing environment (Alembic handles prod migrations)
     Base.metadata.create_all(bind=engine)
+    # create_all never removes columns; drop the retired unused ones (idempotent)
+    try:
+        from app.core.schema_cleanup import drop_retired_columns
+        drop_retired_columns(engine)
+    except Exception as e:
+        logger.error(f"Retired-column cleanup failed (inserts may fail until fixed): {e}")
     seed_initial_issue_categories()
     try:
         from app.seed.seed_famous_smartphones import seed_famous_smartphones
         seed_famous_smartphones()
     except Exception as e:
         logger.error(f"Error seeding famous smartphones on startup: {e}")
+    # Startup seeding may have changed the catalog; drop any stale cached responses (matters for shared Redis)
+    cache.invalidate_all()
+    logger.info(f"Response cache backend: {cache.name}")
     yield
     logger.info("Shutting down WorthIt Platform Backend...")
 
@@ -90,7 +101,17 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Let the browser read cache/latency diagnostics headers
+    expose_headers=["X-Cache", "X-Process-Time-Ms"],
 )
+
+@app.middleware("http")
+async def add_process_time_header(request: Request, call_next):
+    """Stamps server-side processing time on every response (used for Redis before/after benchmarks)."""
+    start = time.perf_counter()
+    response = await call_next(request)
+    response.headers["X-Process-Time-Ms"] = f"{(time.perf_counter() - start) * 1000:.2f}"
+    return response
 
 @app.get("/health", tags=["System"])
 def health_check():
@@ -103,7 +124,8 @@ def health_check():
     return {
         "status": "healthy",
         "service": settings.PROJECT_NAME,
-        "environment": settings.ENVIRONMENT
+        "environment": settings.ENVIRONMENT,
+        "cache": cache.name
     }
 
 # Register all API version 1 route endpoints under prefix (e.g. /api/v1)

@@ -15,11 +15,9 @@ class ProductDiscoveryRun(Base):
     completed_at = Column(DateTime, nullable=True)
     status = Column(String(50), nullable=False, default="RUNNING") # RUNNING, COMPLETED, FAILED
     sources_searched = Column(Integer, default=0, nullable=False)
-    candidates_found = Column(Integer, default=0, nullable=False)
     extracted_count = Column(Integer, default=0, nullable=False)
     duplicates_detected = Column(Integer, default=0, nullable=False)
     new_products_created = Column(Integer, default=0, nullable=False)
-    failed_count = Column(Integer, default=0, nullable=False)
     error_log = Column(Text, nullable=True)
 
     # Relationships

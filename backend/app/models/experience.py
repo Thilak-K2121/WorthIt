@@ -22,7 +22,6 @@ class ExperienceReport(Base):
     performance_satisfaction = Column(Numeric(2, 1), nullable=False)
     software_satisfaction = Column(Numeric(2, 1), nullable=False)
     camera_satisfaction = Column(Numeric(2, 1), nullable=True)
-    build_satisfaction = Column(Numeric(2, 1), nullable=True)
 
     # Longitudinal Experience Nuances
     battery_degradation_perception = Column(String(50), nullable=True) # NONE, MINOR, MODERATE, SEVERE
@@ -36,7 +35,6 @@ class ExperienceReport(Base):
     # Qualitative Reflections
     biggest_positive = Column(Text, nullable=True)
     biggest_problem = Column(Text, nullable=True)
-    general_notes = Column(Text, nullable=True)
 
     # Trust & Verification Level
     trust_status = Column(String(50), nullable=False, default="SELF_REPORTED") # SELF_REPORTED, VERIFIED_PURCHASE, MODERATED, SUSPICIOUS

@@ -39,11 +39,9 @@ class DiscoveryService:
             run.sources_searched = len(results)
 
             for item in results:
-                run.candidates_found += 1
                 extracted = await extractor.extract_smartphone_specs(item.snippet, item.url, item.title)
                 
                 if not extracted:
-                    run.failed_count += 1
                     continue
 
                 run.extracted_count += 1
@@ -60,8 +58,6 @@ class DiscoveryService:
                         product_id=existing_product.id,
                         discovery_run_id=run.id,
                         source_url=item.url,
-                        source_title=item.title,
-                        source_snippet=item.snippet,
                         provider="TAVILY",
                         raw_extracted_json=extracted.model_dump(mode="json")
                     )
@@ -81,7 +77,6 @@ class DiscoveryService:
                         official_url=extracted.official_url or item.url,
                         status="ACTIVE", # Enabled for immediate browsing in student platform
                         discovery_source="AUTOMATED",
-                        verification_status="VERIFIED"
                     )
                     db.add(new_product)
                     db.flush()
@@ -103,8 +98,6 @@ class DiscoveryService:
                         product_id=new_product.id,
                         discovery_run_id=run.id,
                         source_url=item.url,
-                        source_title=item.title,
-                        source_snippet=item.snippet,
                         provider="TAVILY",
                         raw_extracted_json=extracted.model_dump(mode="json")
                     )

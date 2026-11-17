@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { 
   Cpu, Play, RefreshCw, Clock, CheckCircle2, XCircle, 
   Smartphone, Inbox, Sparkles, ChevronDown, ChevronUp, ExternalLink, ArrowRight, Layers, Globe,
-  Search, Shield, Bot, Database, Activity, Zap, Check
+  Search, Shield, Bot, Database, Activity, Zap, Check, Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+import CatalogManager from '../components/admin/CatalogManager';
 
 const DISCOVERY_STAGES = [
   {
@@ -165,6 +166,21 @@ export default function AdminDiscoveryPage() {
       await refreshData();
     } catch (err) {
       alert(`Review failed: ${err.message}`);
+    }
+  };
+
+  const handleDeleteDiscovered = async (productId, label) => {
+    const message = `Delete "${label}" from the database?\n\n`
+      + 'Its variants, source citations and any owner reports are removed too. This cannot be undone.';
+    if (!window.confirm(message)) return;
+    try {
+      await api.adminDeleteProduct(productId);
+      await refreshData();
+    } catch (err) {
+      const hint = /admin key/i.test(err.message)
+        ? '\n\nUnlock the Catalog Manager tab with your admin key first.'
+        : '';
+      alert(`Delete failed: ${err.message}${hint}`);
     }
   };
 
@@ -363,7 +379,7 @@ export default function AdminDiscoveryPage() {
         )}
       </div>
 
-      <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 pb-3">
         <button
           onClick={() => setActiveTab('runs')}
           className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
@@ -391,6 +407,18 @@ export default function AdminDiscoveryPage() {
               {pendingSuggestions.length}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('catalog')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 ${
+            activeTab === 'catalog'
+              ? 'bg-[#00D09C] text-white shadow-mint'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          <Database className="w-4 h-4" />
+          <span>Catalog Manager</span>
         </button>
       </div>
 
@@ -533,13 +561,24 @@ export default function AdminDiscoveryPage() {
                                     </a>
 
                                     {src.product_id ? (
-                                      <Link
-                                        to={`/products/${src.product_id}`}
-                                        className="px-3 py-1.5 rounded-xl btn-lexi-mint text-xs font-bold flex items-center gap-1 shadow-subtle"
-                                      >
-                                        <span>View in Catalog</span>
-                                        <ArrowRight className="w-3.5 h-3.5" />
-                                      </Link>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteDiscovered(src.product_id, `${brandName} ${modelTitle}`)}
+                                          title="Delete this phone from the database"
+                                          aria-label={`Delete ${brandName} ${modelTitle}`}
+                                          className="p-1.5 rounded-xl bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-400 hover:text-rose-700 transition-colors"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                        <Link
+                                          to={`/products/${src.product_id}`}
+                                          className="px-3 py-1.5 rounded-xl btn-lexi-mint text-xs font-bold flex items-center gap-1 shadow-subtle"
+                                        >
+                                          <span>View in Catalog</span>
+                                          <ArrowRight className="w-3.5 h-3.5" />
+                                        </Link>
+                                      </div>
                                     ) : (
                                       <span className="text-[11px] font-bold text-slate-400">
                                         Cataloged
@@ -580,7 +619,10 @@ export default function AdminDiscoveryPage() {
         </div>
       )}
 
-      {/* 6. Tab Content: Suggestions Queue */}
+      {/* 6. Tab Content: Manual catalog add / delete (admin key protected) */}
+      {activeTab === 'catalog' && <CatalogManager onCatalogChanged={refreshData} />}
+
+      {/* 7. Tab Content: Suggestions Queue */}
       {activeTab === 'suggestions' && (
         <div className="space-y-4 animate-fade-in-up">
           {suggestions.length > 0 ? (

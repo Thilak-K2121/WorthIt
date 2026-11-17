@@ -14,6 +14,8 @@ import {
   HelpCircle, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Camera, ShieldCheck,
   AlertTriangle, Wrench, ShieldAlert
 } from 'lucide-react';
+import { api } from '../../services/api';
+import { formatCurrency } from '../../utils/formatters';
 
 /**
  * 3-Step Longitudinal Ownership Form Component.
@@ -30,6 +32,7 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
   // Form State: Captures device selection, ownership duration, ratings, and feedback
   const [formData, setFormData] = useState({
     product_id: requestedProductId || '',
+    variant_id: '',
     purchase_price: '',
     ownership_duration_months: 12,
     overall_satisfaction: '4.5',
@@ -68,6 +71,19 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
     }
   }, [products, requestedBrand, requestedProductId]);
 
+  // Load the selected phone's variants so the owner can say which one they bought
+  const [variants, setVariants] = useState([]);
+  useEffect(() => {
+    setVariants([]);
+    setFormData(prev => ({ ...prev, variant_id: '' }));
+    if (!formData.product_id) return;
+    let cancelled = false;
+    api.getProduct(formData.product_id)
+      .then(p => { if (!cancelled) setVariants(p.variants || []); })
+      .catch(() => { if (!cancelled) setVariants([]); });
+    return () => { cancelled = true; };
+  }, [formData.product_id]);
+
   const handleNext = () => setStep(prev => Math.min(prev + 1, 3));
   const handleBack = () => setStep(prev => Math.max(prev - 1, 1));
 
@@ -77,10 +93,8 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
     const payload = {
       product_id: formData.product_id,
       purchase_date: purchaseDate,
-      ownership_start_date: purchaseDate,
+      variant_id: formData.variant_id || undefined,
       purchase_price: formData.purchase_price ? parseFloat(formData.purchase_price) : undefined,
-      purchase_country: 'India',
-      status: 'CURRENTLY_OWNING',
       initial_report: {
         ownership_duration_months: parseInt(formData.ownership_duration_months),
         overall_satisfaction: parseFloat(formData.overall_satisfaction),
@@ -95,16 +109,13 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
         issues: hasIssues && issueCategory ? [{
           category_slug: issueCategory,
           issue_title: issueTitle.trim() || `${issueCategory.charAt(0).toUpperCase() + issueCategory.slice(1)} hardware or software issue`,
-          severity: 'MODERATE',
           occurred_at_month: occurredAtMonth ? parseInt(occurredAtMonth) : undefined,
           repair_required: repairRequired,
-          resolved: true
         }] : undefined,
         repairs: hasIssues && repairRequired ? [{
           part_replaced: repairPart || 'SCREEN',
           cost: repairCost ? parseFloat(repairCost) : 0,
           official_service_center: officialServiceCenter,
-          covered_under_warranty: !repairCost || parseFloat(repairCost) === 0,
           currency: 'INR'
         }] : undefined
       }
@@ -182,6 +193,47 @@ export default function OwnershipForm({ products, onSubmit, isSubmitting, reques
                 >
                   Can't find your phone? Request it here →
                 </Link>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="variant" className="text-sm font-bold text-slate-900 block mb-2">
+                  Which variant? <span className="text-slate-400 font-medium">(optional)</span>
+                </label>
+                <select
+                  id="variant"
+                  value={formData.variant_id}
+                  onChange={(e) => setFormData({ ...formData, variant_id: e.target.value })}
+                  disabled={variants.length === 0}
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-300 text-slate-900 text-sm font-medium focus:outline-none focus:border-[#00D09C] focus:bg-white disabled:opacity-60"
+                >
+                  <option value="">{variants.length === 0 ? 'No variants listed' : 'Not sure / skip'}</option>
+                  {variants.map(v => (
+                    <option key={v.id} value={v.id}>
+                      {[v.ram, v.storage].filter(Boolean).join(' / ') || 'Standard'}
+                      {v.launch_price ? ` (launched at ${formatCurrency(v.launch_price, v.currency || 'INR')})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="purchase_price" className="text-sm font-bold text-slate-900 block mb-2">
+                  Price you paid (₹) <span className="text-slate-400 font-medium">(optional)</span>
+                </label>
+                <input
+                  id="purchase_price"
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputMode="numeric"
+                  value={formData.purchase_price}
+                  onChange={(e) => setFormData({ ...formData, purchase_price: e.target.value })}
+                  placeholder="e.g. 54999"
+                  className="w-full px-4 py-3.5 rounded-2xl bg-slate-50 border border-slate-300 text-slate-900 text-sm font-medium focus:outline-none focus:border-[#00D09C] focus:bg-white"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">After discounts and offers. Shown only as an average on the phone page.</p>
               </div>
             </div>
 

@@ -1,7 +1,8 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_client_session_hash
+from app.api.deps import get_db
+from app.core.cache import invalidate_catalog_cache
 from app.schemas.suggestion import (
     ProductSuggestionCreate,
     ProductSuggestionResponse,
@@ -14,11 +15,9 @@ router = APIRouter()
 @router.post("", response_model=ProductSuggestionResponse, status_code=201)
 def submit_product_suggestion(
     suggestion_in: ProductSuggestionCreate,
-    request: Request,
     db: Session = Depends(get_db)
 ):
-    ip_hash = get_client_session_hash(request)
-    return SuggestionService.create_suggestion(db, suggestion_in, ip_hash=ip_hash)
+    return SuggestionService.create_suggestion(db, suggestion_in)
 
 @router.get("", response_model=List[ProductSuggestionResponse])
 def list_suggestions(
@@ -39,4 +38,5 @@ def review_suggestion(
     updated = SuggestionService.review_suggestion(db, suggestion_id, review_in)
     if not updated:
         raise HTTPException(status_code=404, detail="Suggestion not found")
+    invalidate_catalog_cache("suggestion reviewed")
     return updated

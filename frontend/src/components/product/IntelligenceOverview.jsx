@@ -1,5 +1,5 @@
 import React from 'react';
-import { Battery, Cpu, Terminal, Camera, Shield, ThumbsUp, Wrench, Sparkles } from 'lucide-react';
+import { Battery, Cpu, Terminal, Camera, Shield, ThumbsUp, Wrench, Sparkles, Wallet } from 'lucide-react';
 import { formatCurrency, getScoreColor } from '../../utils/formatters';
 
 export default function IntelligenceOverview({ insights }) {
@@ -198,6 +198,70 @@ export default function IntelligenceOverview({ insights }) {
           )}
         </div>
       </div>
+
+      <PricePaidCard stats={insights.price_paid} />
+    </div>
+  );
+}
+
+function PricePaidCard({ stats }) {
+  if (!stats) return null;
+  const vs = stats.avg_vs_launch_percentage;
+
+  return (
+    <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-emerald-600" />
+          What Owners Actually Paid
+        </h4>
+        <span className="text-xs text-slate-500 font-mono bg-slate-100 px-2 py-0.5 rounded-md shrink-0">
+          {stats.sample_size} {stats.sample_size === 1 ? 'owner' : 'owners'}
+        </span>
+      </div>
+
+      {stats.sample_size === 0 ? (
+        <p className="text-xs text-slate-500">
+          No purchase prices reported yet. Owners can add what they paid when they share their experience.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+              <span className="text-[11px] text-slate-500 block font-semibold uppercase tracking-wider">Average Paid</span>
+              <span className="text-xl font-black text-slate-900">{formatCurrency(stats.average_paid, stats.currency)}</span>
+            </div>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+              <span className="text-[11px] text-slate-500 block font-semibold uppercase tracking-wider">Median Paid</span>
+              <span className="text-xl font-black text-slate-900">{formatCurrency(stats.median_paid, stats.currency)}</span>
+            </div>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+              <span className="text-[11px] text-slate-500 block font-semibold uppercase tracking-wider">Range</span>
+              <span className="text-sm font-black text-slate-900 block mt-1">
+                {stats.min_paid === stats.max_paid
+                  ? formatCurrency(stats.min_paid, stats.currency)
+                  : `${formatCurrency(stats.min_paid, stats.currency)} – ${formatCurrency(stats.max_paid, stats.currency)}`}
+              </span>
+            </div>
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/70">
+              <span className="text-[11px] text-slate-500 block font-semibold uppercase tracking-wider">vs Launch Price</span>
+              {vs == null ? (
+                <span className="text-sm font-bold text-slate-400 block mt-1">Not enough data</span>
+              ) : (
+                <span className={`text-xl font-black ${vs < 0 ? 'text-emerald-700' : vs > 0 ? 'text-rose-600' : 'text-slate-900'}`}>
+                  {vs === 0 ? 'At launch' : `${Math.abs(vs)}% ${vs < 0 ? 'below' : 'above'}`}
+                </span>
+              )}
+            </div>
+          </div>
+          {vs != null && (
+            <p className="text-[11px] text-slate-400 mt-3">
+              Compared with the official launch price of the exact variant each owner bought
+              ({stats.launch_comparison_sample_size} of {stats.sample_size} owners specified a variant).
+            </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -20,7 +20,6 @@ class Product(Base):
     official_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, default="ACTIVE") # ACTIVE, PENDING, DISCONTINUED
     discovery_source = Column(String(50), nullable=False, default="MANUAL") # MANUAL, AUTOMATED, USER_SUGGESTED
-    verification_status = Column(String(50), nullable=False, default="VERIFIED") # VERIFIED, UNVERIFIED, FLAGGED
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -53,8 +52,6 @@ class ProductSource(Base):
     product_id = Column(String(36), ForeignKey("products.id", ondelete="CASCADE"), nullable=True, index=True)
     discovery_run_id = Column(String(36), ForeignKey("product_discovery_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     source_url = Column(String(1000), nullable=False)
-    source_title = Column(String(500), nullable=True)
-    source_snippet = Column(Text, nullable=True)
     provider = Column(String(50), nullable=False, default="TAVILY") # TAVILY, MANUAL_SUBMISSION, RSS
     raw_extracted_json = Column(JSON, nullable=True)
     discovered_at = Column(DateTime, default=datetime.utcnow, nullable=False)

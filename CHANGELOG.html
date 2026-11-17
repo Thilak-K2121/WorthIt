@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorthIt Changelog</title>
+<style>
+  :root {
+    --ink: #0f172a; --muted: #64748b; --line: #e2e8f0; --soft: #f8fafc;
+    --mint: #00a77d; --mint-bg: #ecfdf5; --amber-bg: #fffbeb; --amber: #92400e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fff; color: var(--ink);
+    font: 14px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 40px 0 8px; padding-top: 24px; border-top: 2px solid var(--ink); }
+  h3 { font-size: 15px; margin: 24px 0 6px; }
+  p, li { margin: 4px 0; }
+  ul { padding-left: 20px; }
+  code { font: 12.5px/1.4 Consolas, "SF Mono", monospace; background: var(--soft); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; }
+  pre { font: 12.5px/1.5 Consolas, "SF Mono", monospace; background: var(--soft); border: 1px solid var(--line); padding: 12px; border-radius: 8px; overflow-x: auto; white-space: pre-wrap; }
+  .sub { color: var(--muted); margin: 0; }
+  .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 12px; }
+  .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .tag.add { color: var(--mint); border-color: #a7f3d0; background: var(--mint-bg); }
+  .tag.fix { color: #9f1239; border-color: #fecdd3; background: #fff1f2; }
+  .tag.rm { color: #475569; }
+  .table-wrap { overflow-x: auto; margin: 10px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 7px 8px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td.win { color: var(--mint); font-weight: 700; }
+  .note { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin: 10px 0; }
+  .resume { background: var(--mint-bg); border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px 16px; }
+  .resume li { margin: 6px 0; }
+  .blank td { color: #cbd5e1; }
+  @media print {
+    main { padding: 0; max-width: none; }
+    h2 { break-before: auto; break-after: avoid; }
+    table, pre, .note, .resume { break-inside: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>WorthIt Changelog</h1>
+  <p class="sub">Longitudinal smartphone experience platform: FastAPI + PostgreSQL (Supabase) + React, deployed on Render.</p>
+  <p class="sub">Newest entries first. Add a new <code>&lt;section&gt;</code> at the top of the log for each release.</p>
+
+  <!-- ===================================================================== -->
+  <section>
+    <h2>2026-11-17 (update) · In-memory cache, unused-column cleanup</h2>
+    <div class="meta">
+      <span class="tag add">Added</span><span class="tag fix">Changed</span><span class="tag rm">Removed</span>
+    </div>
+
+    <h3>Changed: cache now lives in server RAM by default</h3>
+    <ul>
+      <li>The Render workspace hit its free Key Value (Redis) limit, and the existing instance belongs to another project.
+        The cache layer is now pluggable, selected by <code>CACHE_BACKEND</code>:
+        <code>auto</code> (default: Redis if <code>REDIS_URL</code> is set, otherwise RAM), <code>memory</code>, <code>redis</code>, <code>off</code>.</li>
+      <li><strong>RAM backend</strong> (<code>MemoryCache</code>): thread-safe LRU with per-entry TTL and a byte budget (<code>CACHE_MAX_MB</code>, default 64 MB, well inside Render's 512 MB).
+        Least-recently-used entries are evicted once the budget is reached, so the cache cannot exhaust the instance's memory.</li>
+      <li>Everything else is unchanged: the same endpoints, the same invalidation on every write, the same <code>X-Cache</code> / <code>X-Process-Time-Ms</code> headers, and the same admin stats/flush panel (it now also shows RAM used).</li>
+      <li><strong>Trade-offs vs Redis:</strong> the cache is per process and empties on restart or spin-down; the first request afterwards is a MISS.
+        This is correct here because the Dockerfile runs a single uvicorn worker. If the backend is ever scaled to several workers or instances, switch to Redis by setting <code>REDIS_URL</code>.</li>
+      <li>Tests run every cache scenario against <em>both</em> backends, plus dedicated TTL, LRU-eviction and byte-budget tests.</li>
+    </ul>
+
+    <h3>Added: "What Owners Actually Paid" on the phone page</h3>
+    <ul>
+      <li><code>ownerships.purchase_price</code> was stored but never shown, and the form had no input for it, so only seed data had prices.
+        It is now surfaced instead of being removed.</li>
+      <li><strong>Phone page:</strong> a new card shows the average and median price paid, the range, and how far owners paid above or below launch price.</li>
+      <li><strong>Fair comparison:</strong> each owner is compared against the launch price of the <em>exact variant they bought</em> (e.g. 12 GB/256 GB vs 12 GB/256 GB), so buying a higher-storage model isn't counted as a markup.
+        Owners who skipped the variant still count toward the average, but not toward the launch comparison.</li>
+      <li><strong>Share Experience form, step 1:</strong> new optional "Which variant?" picker (shows each variant's launch price) and "Price you paid (₹)" field.</li>
+      <li>The backend ignores a <code>variant_id</code> that belongs to a different phone, so a mismatched variant can't skew the comparison.</li>
+      <li>API: <code>GET /products/{id}/insights</code> now includes a <code>price_paid</code> object. It is served from the cache and refreshed whenever a new ownership is added.</li>
+      <li>3 new tests (stats math, empty state, foreign-variant guard). Full suite: <strong>33 passed</strong>.</li>
+    </ul>
+
+    <h3>Removed: 23 unused database columns</h3>
+    <p>Each column was traced through the backend logic, the API schemas, the seed data and every React component.
+      A column was removed only if no screen displays it <em>and</em> no logic reads it. Most were either never written, or written with a constant, a default or a value copied from another column.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Table</th><th style="text-align:left">Removed columns</th><th style="text-align:left">Why they were dead</th></tr></thead>
+      <tbody>
+        <tr><td>products</td><td style="text-align:left;white-space:normal"><code>verification_status</code></td><td style="text-align:left;white-space:normal">Always written as "VERIFIED"; never displayed or filtered on</td></tr>
+        <tr><td>product_sources</td><td style="text-align:left;white-space:normal"><code>source_title</code>, <code>source_snippet</code></td><td style="text-align:left;white-space:normal">Stored per discovery hit, never read back (the UI uses the URL and provider)</td></tr>
+        <tr><td>product_discovery_runs</td><td style="text-align:left;white-space:normal"><code>candidates_found</code>, <code>failed_count</code></td><td style="text-align:left;white-space:normal">Redundant: equal to <code>sources_searched</code> and <code>sources − extracted</code>; never displayed</td></tr>
+        <tr><td>ownerships</td><td style="text-align:left;white-space:normal"><code>ownership_start_date</code>, <code>ownership_end_date</code>, <code>status</code>, <code>previous_phone</code>, <code>purchase_source</code>, <code>purchase_country</code>, <code>owner_session_hash</code></td><td style="text-align:left;white-space:normal">Start date duplicated <code>purchase_date</code>; status and country were constants from the form; the rest were never sent or never read (the session hash was meant for rate limiting that was never built)</td></tr>
+        <tr><td>experience_reports</td><td style="text-align:left;white-space:normal"><code>build_satisfaction</code>, <code>general_notes</code></td><td style="text-align:left;white-space:normal">Not collected by the form, not shown anywhere (a build score was computed but never rendered)</td></tr>
+        <tr><td>reported_issues</td><td style="text-align:left;white-space:normal"><code>severity</code>, <code>resolved</code>, <code>repair_cost</code>, <code>notes</code></td><td style="text-align:left;white-space:normal">Form always sent "MODERATE"/true; cost and notes never sent; none displayed (repair costs come from <code>repair_records.cost</code>)</td></tr>
+        <tr><td>repair_records</td><td style="text-align:left;white-space:normal"><code>covered_under_warranty</code>, <code>repair_notes</code></td><td style="text-align:left;white-space:normal">Warranty flag was derived from cost == 0; notes never sent; neither displayed</td></tr>
+        <tr><td>issue_categories</td><td style="text-align:left;white-space:normal"><code>description</code></td><td style="text-align:left;white-space:normal">Seeded text that nothing reads</td></tr>
+        <tr><td>product_suggestions</td><td style="text-align:left;white-space:normal"><code>approximate_release_date</code>, <code>submitter_ip_hash</code></td><td style="text-align:left;white-space:normal">The suggest form never sends a date; the IP hash was stored but never read</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <ul>
+      <li><strong>Kept on purpose:</strong> timestamps (<code>created_at</code>, <code>updated_at</code>, <code>completed_at</code>, <code>discovered_at</code>);
+        <code>error_log</code> (the only record of why a discovery run failed); <code>official_name</code> (used by catalog search);
+        <code>would_buy_again_reason</code> (shown as the top owner quote in insights); the currency columns (used for price formatting); <code>purchase_price</code> (now shown, see above).</li>
+      <li><strong>Migration:</strong> the app manages its schema with <code>create_all</code>, which never drops columns.
+        Eight of the removed columns are <code>NOT NULL</code> with only Python-side defaults, so leaving them would break every insert.
+        A new idempotent step (<code>app/core/schema_cleanup.py</code>) drops them on startup in a single transaction.
+        Preview it by hand with <code>python scripts/drop_unused_columns.py</code> (dry run) or <code>--apply</code>.</li>
+      <li><strong>Verified on PostgreSQL 16:</strong> I built the old schema with the previous release's code and seed data, then started the new app against it.
+        Columns went 112 → 89 with all rows kept (110 ownerships, 360 reports). Ownership, report, issue, repair, admin add, suggestion approve and discovery writes all succeeded,
+        including requests from an old client still sending removed fields. A second run is a no-op.</li>
+      <li>API responses no longer include these fields. Request bodies that still contain them are accepted and the extra fields are ignored.</li>
+    </ul>
+
+        <h3>Performance: RAM cache, before vs after (local, 2026-11-17)</h3>
+    <p>Same harness (<code>backend/scripts/benchmark_cache.py</code>, 30 interleaved pairs per endpoint, medians).
+      In this run the backend and PostgreSQL were both on the same machine, so database time was close to its minimum.
+      That makes the speedups below a <strong>lower bound</strong>; a networked database (Render ↔ Supabase) gains more.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Endpoint</th><th>Server before</th><th>Server after</th><th>Speedup</th><th>E2E before</th><th>E2E after</th><th>E2E reduction</th></tr></thead>
+      <tbody>
+        <tr><td>Catalog list (500 phones)</td><td>14.7 ms</td><td>1.2 ms</td><td class="win">12×</td><td>16.1 ms</td><td>2.5 ms</td><td class="win">84.7%</td></tr>
+        <tr><td>Brand list</td><td>2.8 ms</td><td>0.8 ms</td><td class="win">3.7×</td><td>3.7 ms</td><td>1.7 ms</td><td class="win">55.0%</td></tr>
+        <tr><td>Product detail</td><td>67.0 ms</td><td>0.9 ms</td><td class="win">75×</td><td>68.3 ms</td><td>2.0 ms</td><td class="win">97.1%</td></tr>
+        <tr><td>Longitudinal insights</td><td>15.8 ms</td><td>1.0 ms</td><td class="win">16×</td><td>17.3 ms</td><td>2.4 ms</td><td class="win">86.4%</td></tr>
+        <tr><td>Experience reports</td><td>8.6 ms</td><td>1.2 ms</td><td class="win">7.5×</td><td>9.9 ms</td><td>2.4 ms</td><td class="win">75.9%</td></tr>
+        <tr><td>Side-by-side compare</td><td>33.4 ms</td><td>1.0 ms</td><td class="win">33×</td><td>34.9 ms</td><td>2.2 ms</td><td class="win">93.6%</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Cached responses come back in about 1 ms from RAM, versus about 2–3 ms from Redis in the earlier run (no network hop).</p>
+
+    <h3>Production run (Render + Supabase, RAM cache): to be filled in</h3>
+    <pre>cd backend
+python scripts/benchmark_cache.py --base-url https://worthit-backend-v4ob.onrender.com/api/v1 -n 30</pre>
+    <div class="table-wrap">
+    <table class="blank">
+      <thead><tr><th>Endpoint</th><th>Server before</th><th>Server after</th><th>Speedup</th><th>E2E before</th><th>E2E after</th><th>E2E reduction</th></tr></thead>
+      <tbody>
+        <tr><td>Catalog list (500 phones)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Brand list</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Product detail</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Longitudinal insights</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Experience reports</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Side-by-side compare</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Resume bullets (replace the earlier Redis ones; swap in production figures)</h3>
+    <div class="resume">
+      <ul>
+        <li>Built a pluggable read-through response cache (in-process LRU + TTL with a memory budget, or Redis) for a FastAPI + PostgreSQL API.
+          Cache hits are served in about 1 ms, and median latency on the six hottest endpoints dropped by up to 97%, measured with a 30-request A/B benchmark harness.</li>
+        <li>Kept cached data consistent with write-path invalidation and bounded LRU eviction, with a fail-open design. Covered by 33 automated tests, with every cache scenario run against both backends.</li>
+        <li>Audited the data model end to end and removed 23 dead columns (about 20% of the schema). Wrote an idempotent, transactional migration and verified it against a copy of the old PostgreSQL schema with zero data loss.</li>
+        <li>Turned a dormant data field into a user-facing "price actually paid" insight. It compares each owner's price with the launch price of the exact variant they bought, and covers the backend aggregation, the form capture and the UI.</li>
+        <li>Built an admin catalog-management console (React + FastAPI) with key-protected add/delete endpoints, dedup-checked manual entry and cascading deletes, for curating records produced by the AI (Tavily + Gemini) discovery pipeline.</li>
+      </ul>
+    </div>
+
+    <h3>Deployment checklist (Render)</h3>
+    <ol>
+      <li><strong>Back up the Supabase database first</strong> (Dashboard → Database → Backups). The column drop is irreversible.</li>
+      <li>Optional: preview with <code>python scripts/drop_unused_columns.py</code> using the production <code>DATABASE_URL</code>.</li>
+      <li>Leave <code>REDIS_URL</code> unset. Optionally set <code>CACHE_BACKEND=memory</code> and <code>CACHE_MAX_MB=64</code> explicitly.</li>
+      <li>Set <code>ADMIN_API_KEY</code> if you haven't already.</li>
+      <li>Deploy. The startup log shows <code>Dropped 23 retired columns</code> once, and <code>/health</code> reports <code>"cache": "memory"</code>.</li>
+      <li>Run the production benchmark and fill in the table above.</li>
+    </ol>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section>
+    <h2>2026-11-17 · Redis caching, admin catalog management, UI cleanup</h2>
+    <p class="note">Superseded in part: Redis was swapped for an in-memory cache in the update above, so this section's production run and resume bullets no longer apply.</p>
+    <div class="meta">
+      <span class="tag add">Added</span><span class="tag fix">Fixed</span><span class="tag rm">Removed</span>
+    </div>
+
+    <h3>Added: Redis read-through response cache</h3>
+    <ul>
+      <li>New module <code>backend/app/core/cache.py</code>. It caches the fully serialized JSON for the six hot read endpoints:
+        catalog list, brand list, product detail, longitudinal insights, experience reports and side-by-side compare.</li>
+      <li>A cache hit returns the stored bytes directly. It skips the SQL queries, ORM hydration and Pydantic serialization.</li>
+      <li><strong>Write invalidation:</strong> every write that can change catalog data clears the cache namespace (<code>worthit:v1:*</code>) with non-blocking <code>SCAN</code> + <code>UNLINK</code>.
+        The writes covered are product create, admin add/delete, ownership registration, experience report, suggestion review, discovery runs and app startup seeding.
+        TTL (default 600 s) is a second safety net.</li>
+      <li><strong>Fail-open + circuit breaker:</strong> if <code>REDIS_URL</code> is unset or Redis is unreachable, the API serves from PostgreSQL as before.
+        After an error, Redis is skipped for 30 s so a dead cache never adds timeout latency. Verified by stopping Redis mid-run: requests kept returning 200.</li>
+      <li>Error responses (404/400) are never cached.</li>
+      <li>Diagnostics: every response carries <code>X-Process-Time-Ms</code>. Cached endpoints also carry <code>X-Cache: HIT | MISS | BYPASS | OFF</code>.
+        Sending <code>X-Cache-Bypass: 1</code> forces the database path (used for A/B benchmarks).</li>
+      <li>Admin cache panel: connection status, hit/miss ratio, cached key count, and a "Flush cache" button.</li>
+      <li>New env vars: <code>REDIS_URL</code>, <code>CACHE_TTL_SECONDS</code>. A <code>redis</code> service was added to <code>docker-compose.yml</code>.</li>
+    </ul>
+
+    <h3>Added: admin catalog management (manual add/delete)</h3>
+    <ul>
+      <li>AI discovery still writes straight to the database. Admins can now curate the results:
+        <ul>
+          <li><strong>Catalog Manager</strong> tab in the Discovery console: add a phone by hand (brand, model, release date, market, URL, description, multiple RAM/storage/chipset/price variants),
+            and search all entries and delete any of them.</li>
+          <li>Each AI-discovered phone card in the run logs now has a delete button.</li>
+        </ul>
+      </li>
+      <li>New endpoints under <code>/api/v1/admin</code>:
+        <code>GET /verify</code>, <code>POST /products</code>, <code>DELETE /products/{id}</code>, <code>GET /cache/stats</code>, <code>POST /cache/flush</code>.</li>
+      <li>Manual adds go through the same Jaccard deduplication as the AI pipeline. Duplicates are rejected with HTTP 409.</li>
+      <li>Delete cascades to variants, source citations, ownerships and their experience reports. The confirmation dialog warns how many owner records will go.</li>
+      <li><strong>Security:</strong> admin routes require an <code>X-Admin-Key</code> header matching <code>ADMIN_API_KEY</code> (constant-time compare).
+        In production they <em>fail closed</em> (HTTP 503) if the key isn't configured. The console asks for the key once and keeps it in the browser's localStorage.</li>
+    </ul>
+
+    <h3>Removed</h3>
+    <ul>
+      <li>The non-functional "Sign In" button in the navbar. The app has no user accounts; it only linked to <code>/products</code>.</li>
+    </ul>
+
+    <h3>Fixed</h3>
+    <ul>
+      <li><code>frontend/src/services/api.js</code>: <code>fetchJson</code> spread <code>options</code> after <code>headers</code>,
+        so any caller passing custom headers silently lost <code>Content-Type: application/json</code>. JSON bodies were then rejected with a 422.
+        This was latent until the admin calls began sending headers.</li>
+    </ul>
+
+    <h3>Tests</h3>
+    <ul>
+      <li>New <code>backend/tests/test_cache_and_admin.py</code> (11 tests, uses <code>fakeredis</code>). It covers MISS→HIT, bypass, write invalidation, errors not cached,
+        Redis-off and Redis-down fail-open, admin delete + cascade, duplicate rejection, key enforcement, and fail-closed in production.</li>
+      <li>Full suite: <strong>22 passed</strong> (11 existing + 11 new).</li>
+    </ul>
+
+    <h3>Performance: before vs after Redis</h3>
+    <p>Measured with <code>backend/scripts/benchmark_cache.py</code>. For each endpoint it sends 30 interleaved request pairs:
+      "before" uses <code>X-Cache-Bypass: 1</code> (full PostgreSQL + Python path), and "after" is a normal request served from Redis.
+      All values are medians. "Server" is the backend's own <code>X-Process-Time-Ms</code> and excludes network. "E2E" is what the client measured.</p>
+
+    <h3>Run 1: local backend → Supabase Postgres, Redis 7 in Docker (2026-11-17)</h3>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Endpoint</th><th>Server before</th><th>Server after</th><th>Speedup</th><th>E2E before</th><th>E2E after</th><th>E2E reduction</th></tr></thead>
+      <tbody>
+        <tr><td>Catalog list (500 phones)</td><td>1,157 ms</td><td>3.2 ms</td><td class="win">363×</td><td>1,159 ms</td><td>5.2 ms</td><td class="win">99.6%</td></tr>
+        <tr><td>Brand list</td><td>505 ms</td><td>2.3 ms</td><td class="win">225×</td><td>507 ms</td><td>3.8 ms</td><td class="win">99.3%</td></tr>
+        <tr><td>Product detail</td><td>1,126 ms</td><td>2.2 ms</td><td class="win">503×</td><td>1,128 ms</td><td>3.8 ms</td><td class="win">99.7%</td></tr>
+        <tr><td>Longitudinal insights</td><td>1,430 ms</td><td>2.3 ms</td><td class="win">614×</td><td>1,432 ms</td><td>4.0 ms</td><td class="win">99.7%</td></tr>
+        <tr><td>Experience reports</td><td>475 ms</td><td>2.4 ms</td><td class="win">200×</td><td>477 ms</td><td>3.8 ms</td><td class="win">99.2%</td></tr>
+        <tr><td>Side-by-side compare</td><td>3,641 ms</td><td>2.4 ms</td><td class="win">1,530×</td><td>3,643 ms</td><td>4.0 ms</td><td class="win">99.9%</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p>Cache hit ratio after warm-up: 100% on all six endpoints.</p>
+    <div class="note">
+      <strong>Read this before quoting the numbers.</strong> In this run the backend talked to Supabase over the public internet from a dev machine,
+      so each SQL round trip was expensive. That inflates the "before" times. In production, Render → Supabase latency is usually lower, so expect a smaller multiplier.
+      The "after" side (≈2–5 ms) depends only on Redis and should hold.
+      Fill in Run 2 from production before putting exact figures on a resume.
+    </div>
+
+    <h3>Run 2: production (Render backend + Render Key Value): to be filled in</h3>
+    <pre>cd backend
+python scripts/benchmark_cache.py --base-url https://worthit-backend-v4ob.onrender.com/api/v1 -n 30</pre>
+    <div class="table-wrap">
+    <table class="blank">
+      <thead><tr><th>Endpoint</th><th>Server before</th><th>Server after</th><th>Speedup</th><th>E2E before</th><th>E2E after</th><th>E2E reduction</th></tr></thead>
+      <tbody>
+        <tr><td>Catalog list (500 phones)</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Brand list</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Product detail</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Longitudinal insights</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Experience reports</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+        <tr><td>Side-by-side compare</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+    </div>
+
+    <h3>Resume bullets (draft: swap in the Run 2 figures)</h3>
+    <div class="resume">
+      <ul>
+        <li>Added a Redis read-through cache to a FastAPI + PostgreSQL API. It cut median server response time on the six hottest endpoints from <strong>0.5–3.6 s to under 5 ms</strong> (99%+ reduction, 200–1,500× faster), measured with a 30-request A/B benchmark harness.</li>
+        <li>Designed the cache to fail open, with a circuit breaker and namespace invalidation on every write (SCAN + UNLINK). The API stays correct and available when Redis is stale or down; covered by 11 automated tests using fakeredis.</li>
+        <li>Turned a dormant data field into a user-facing "price actually paid" insight. It compares each owner's price with the launch price of the exact variant they bought, and covers the backend aggregation, the form capture and the UI.</li>
+        <li>Built an admin catalog-management console (React + FastAPI) with key-protected add/delete endpoints, dedup-checked manual entry and cascading deletes. Admins can now curate records produced by the AI (Tavily + Gemini) discovery pipeline.</li>
+      </ul>
+    </div>
+
+    <h3>Deployment checklist (Render)</h3>
+    <ol>
+      <li>Create the Key Value instance (<code>worthit-redis</code>) in the <strong>same region</strong> as the backend service.</li>
+      <li>Copy its <strong>Internal Key Value URL</strong> (<code>redis://red-…:6379</code>) and set it as <code>REDIS_URL</code> on the backend service.</li>
+      <li>Set <code>ADMIN_API_KEY</code> on the backend to a long random string. Without it, admin routes return 503 in production.</li>
+      <li>Redeploy. <code>GET /health</code> should report <code>"cache": "configured"</code>, and a second request to <code>/api/v1/products</code> should return <code>X-Cache: HIT</code>.</li>
+      <li>Run the production benchmark and fill in Run 2 above.</li>
+    </ol>
+  </section>
+
+  <!-- Add older/newer releases as additional <section> blocks. -->
+</main>
+</body>
+</html>

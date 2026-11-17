@@ -15,11 +15,9 @@ class ProductSuggestion(Base):
     model_name = Column(String(150), nullable=False)
     variant_details = Column(String(255), nullable=True) # e.g. "12GB / 256GB"
     official_url = Column(String(500), nullable=True)
-    approximate_release_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
     status = Column(String(50), nullable=False, default="PENDING") # PENDING, APPROVED, REJECTED, DUPLICATE
     target_product_id = Column(String(36), ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
-    submitter_ip_hash = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships

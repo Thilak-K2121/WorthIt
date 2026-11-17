@@ -7,7 +7,6 @@ class ProductSuggestionCreate(BaseModel):
     model_name: str = Field(..., example="Phone (3)")
     variant_details: Optional[str] = Field(None, example="12GB / 256GB")
     official_url: Optional[str] = Field(None, example="https://nothing.tech")
-    approximate_release_date: Optional[date] = None
     notes: Optional[str] = Field(None, example="Launched in India in July 2026")
 
 class ProductSuggestionReview(BaseModel):
@@ -21,7 +20,6 @@ class ProductSuggestionResponse(BaseModel):
     model_name: str
     variant_details: Optional[str]
     official_url: Optional[str]
-    approximate_release_date: Optional[date]
     notes: Optional[str]
     status: str
     target_product_id: Optional[str]

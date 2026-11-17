@@ -1,7 +1,8 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db, get_client_session_hash
+from app.api.deps import get_db
+from app.core.cache import invalidate_catalog_cache
 from app.schemas.ownership import OwnershipCreate, OwnershipResponse
 from app.schemas.experience import ExperienceReportCreate, ExperienceReportResponse
 from app.services.ownership_service import OwnershipService, ExperienceService
@@ -11,11 +12,10 @@ router = APIRouter()
 @router.post("", response_model=OwnershipResponse, status_code=201)
 def register_ownership(
     ownership_in: OwnershipCreate,
-    request: Request,
     db: Session = Depends(get_db)
 ):
-    session_hash = get_client_session_hash(request)
-    created = OwnershipService.create_ownership(db, ownership_in, session_hash=session_hash)
+    created = OwnershipService.create_ownership(db, ownership_in)
+    invalidate_catalog_cache("ownership registered")
     return OwnershipService.get_by_id(db, created.id)
 
 @router.get("/{ownership_id}", response_model=OwnershipResponse)
@@ -39,4 +39,5 @@ def add_experience_report(
         raise HTTPException(status_code=404, detail="Ownership record not found")
     
     report = ExperienceService.add_experience_report(db, ownership_id, report_in)
+    invalidate_catalog_cache("experience report added")
     return report

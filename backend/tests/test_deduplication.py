@@ -20,7 +20,6 @@ def test_find_existing_duplicate_exact_and_fuzzy(db_session):
         model_name="Galaxy S24 Ultra",
         normalized_name="samsung-galaxy-s24-ultra",
         status="ACTIVE",
-        verification_status="VERIFIED"
     )
     db_session.add(p)
     db_session.commit()

@@ -1,16 +1,17 @@
 # ==============================================================================
-# Intelligence Service - Statistical Confidence & Longitudinal Scoring
+# Intelligence Service - Statistical Confidence & Longitudinal Scoring , COMPARE
 # ==============================================================================
 # This service aggregates multi-month owner reviews into longitudinal scores,
 # calculates statistical sample confidence levels (preventing unboxing bias),
 # and generates side-by-side comparison matrices.
 # ==============================================================================
 
+#COMPARE FILE
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from statistics import median
-from app.models.product import Product
+from app.models.product import Product, ProductVariant
 from app.models.ownership import Ownership
 from app.models.experience import ExperienceReport
 from app.models.issue import ReportedIssue, IssueCategory, RepairRecord
@@ -21,6 +22,7 @@ from app.schemas.insights import (
     WouldBuyAgainStats,
     IssueCategoryStats,
     RepairIntelligence,
+    PricePaidStats,
     OwnershipTimelineMilestone,
     ProductComparisonResponse,
     ProductComparisonItem
@@ -130,7 +132,6 @@ class IntelligenceService:
         perf_scores = [float(r.performance_satisfaction) for r in reports if r.performance_satisfaction is not None]
         soft_scores = [float(r.software_satisfaction) for r in reports if r.software_satisfaction is not None]
         cam_scores = [float(r.camera_satisfaction) for r in reports if r.camera_satisfaction is not None]
-        build_scores = [float(r.build_satisfaction) for r in reports if r.build_satisfaction is not None]
 
         sat_12m_scores = [float(r.overall_satisfaction) for r in long_term_reports if r.overall_satisfaction is not None]
 
@@ -182,6 +183,25 @@ class IntelligenceService:
                 repair_required_count=repairs_needed
             ))
         issue_breakdown.sort(key=lambda x: x.report_count, reverse=True)
+
+        # Price paid by owners (purchase_price), compared per-owner to their variant's launch price
+        priced = (
+            db.query(Ownership.purchase_price, ProductVariant.launch_price)
+            .outerjoin(ProductVariant, Ownership.variant_id == ProductVariant.id)
+            .filter(Ownership.product_id == product_id, Ownership.purchase_price > 0)
+            .all()
+        )
+        paid = [float(p) for p, _ in priced]
+        vs_launch = [(float(p) - float(l)) / float(l) * 100 for p, l in priced if l is not None and float(l) > 0]
+        price_paid = PricePaidStats(
+            sample_size=len(paid),
+            average_paid=round(sum(paid) / len(paid), 2) if paid else None,
+            median_paid=round(float(median(paid)), 2) if paid else None,
+            min_paid=min(paid) if paid else None,
+            max_paid=max(paid) if paid else None,
+            avg_vs_launch_percentage=round(sum(vs_launch) / len(vs_launch), 1) if vs_launch else None,
+            launch_comparison_sample_size=len(vs_launch),
+        )
 
         # Repairs calculation
         repairs_query = (
@@ -258,10 +278,10 @@ class IntelligenceService:
             performance_satisfaction=make_score(perf_scores),
             software_satisfaction=make_score(soft_scores),
             camera_satisfaction=make_score(cam_scores),
-            build_satisfaction=make_score(build_scores),
             satisfaction_at_12m=make_score(sat_12m_scores),
             would_buy_again=wba_stats,
             issue_breakdown=issue_breakdown,
+            price_paid=price_paid,
             repair_stats=repair_stats,
             tenure_summary=tenure_milestones
         )

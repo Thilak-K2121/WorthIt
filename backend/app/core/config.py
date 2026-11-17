@@ -22,6 +22,16 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: str = os.getenv("TAVILY_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
+    # Response cache. CACHE_BACKEND: auto (redis if REDIS_URL set, else memory) | memory | redis | off
+    CACHE_BACKEND: str = "auto"
+    CACHE_TTL_SECONDS: int = 600
+    CACHE_MAX_MB: int = 64  # RAM budget for the in-process cache (LRU eviction beyond this)
+    REDIS_URL: str = ""
+
+    # Shared secret for admin catalog management (sent as X-Admin-Key header).
+    # Required in production; when unset outside production, admin routes are open.
+    ADMIN_API_KEY: str = ""
+
     DISCOVERY_CRON_SCHEDULE: str = "0 2 * * *"
     DISCOVERY_ENABLED: bool = True
     MAX_CANDIDATES_PER_RUN: int = 10

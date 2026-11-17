@@ -7,7 +7,7 @@ from app.services.deduplication_service import DeduplicationService
 
 class SuggestionService:
     @staticmethod
-    def create_suggestion(db: Session, suggestion_in: ProductSuggestionCreate, ip_hash: Optional[str] = None) -> ProductSuggestion:
+    def create_suggestion(db: Session, suggestion_in: ProductSuggestionCreate) -> ProductSuggestion:
         # Check if already in catalog
         existing, _ = DeduplicationService.find_existing_duplicate(db, suggestion_in.brand, suggestion_in.model_name)
         status = "DUPLICATE" if existing else "PENDING"
@@ -18,11 +18,9 @@ class SuggestionService:
             model_name=suggestion_in.model_name.strip(),
             variant_details=suggestion_in.variant_details,
             official_url=suggestion_in.official_url,
-            approximate_release_date=suggestion_in.approximate_release_date,
             notes=suggestion_in.notes,
             status=status,
             target_product_id=target_id,
-            submitter_ip_hash=ip_hash
         )
         db.add(suggestion)
         db.commit()
@@ -52,11 +50,9 @@ class SuggestionService:
                 model_name=suggestion.model_name,
                 normalized_name=norm_key,
                 official_name=f"{canonical_brand} {suggestion.model_name}",
-                release_date=suggestion.approximate_release_date,
                 official_url=suggestion.official_url,
                 status="ACTIVE",
                 discovery_source="USER_SUGGESTED",
-                verification_status="VERIFIED"
             )
             db.add(new_product)
             db.flush()

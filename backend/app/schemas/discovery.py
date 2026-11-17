@@ -35,8 +35,6 @@ class ProductSourceSummaryResponse(BaseModel):
     brand: Optional[str] = None
     model_name: Optional[str] = None
     source_url: str
-    source_title: Optional[str] = None
-    source_snippet: Optional[str] = None
     provider: str = "TAVILY"
     raw_extracted_json: Optional[Dict[str, Any]] = None
     discovered_at: datetime
@@ -48,11 +46,9 @@ class DiscoveryRunResponse(BaseModel):
     completed_at: Optional[datetime] = None
     status: str
     sources_searched: int
-    candidates_found: int
     extracted_count: int
     duplicates_detected: int
     new_products_created: int
-    failed_count: int
     error_log: Optional[str] = None
     sources: List[ProductSourceSummaryResponse] = []
     model_config = ConfigDict(from_attributes=True)

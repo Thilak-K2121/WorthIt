@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
+from app.core.cache import cache, cached_json_response
 from app.schemas.insights import ProductInsightsResponse
 from app.services.intelligence_service import IntelligenceService
 
@@ -9,9 +10,13 @@ router = APIRouter()
 @router.get("/products/{product_id}/insights", response_model=ProductInsightsResponse)
 def get_product_insights(
     product_id: str,
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    insights = IntelligenceService.compute_product_insights(db, product_id)
-    if not insights:
-        raise HTTPException(status_code=404, detail="Product not found or has no insights available")
-    return insights
+    def compute():
+        insights = IntelligenceService.compute_product_insights(db, product_id)
+        if not insights:
+            raise HTTPException(status_code=404, detail="Product not found or has no insights available")
+        return insights
+
+    return cached_json_response(request, cache.key("insights", product_id), ProductInsightsResponse, compute)

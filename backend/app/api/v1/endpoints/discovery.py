@@ -2,6 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
+from app.core.cache import invalidate_catalog_cache
 from app.schemas.discovery import (
     DiscoveryRunResponse,
     DiscoveryTriggerRequest
@@ -21,6 +22,9 @@ async def trigger_discovery_run(
         max_results=request.max_results,
         force_mock=request.force_mock
     )
+    # New products and source citations change catalog lists and product detail pages
+    if run.new_products_created or run.duplicates_detected:
+        invalidate_catalog_cache("discovery run")
     return run
 
 @router.get("/runs", response_model=List[DiscoveryRunResponse])

@@ -1,12 +1,14 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload
 from app.models.ownership import Ownership
+from app.models.product import ProductVariant
 from app.models.experience import ExperienceReport
 from app.models.issue import IssueCategory, ReportedIssue, RepairRecord
 from app.schemas.ownership import OwnershipCreate
 from app.schemas.experience import ExperienceReportCreate
 
 class OwnershipService:
+    #getting the product by ID
     @staticmethod
     def get_by_id(db: Session, ownership_id: str) -> Optional[Ownership]:
         return (
@@ -36,20 +38,20 @@ class OwnershipService:
         )
 
     @staticmethod
-    def create_ownership(db: Session, data: OwnershipCreate, session_hash: Optional[str] = None) -> Ownership:
+    def create_ownership(db: Session, data: OwnershipCreate) -> Ownership:
+        # Only accept a variant that belongs to this product (it drives the launch-price comparison)
+        variant_id = data.variant_id
+        if variant_id and not db.query(ProductVariant.id).filter(
+            ProductVariant.id == variant_id, ProductVariant.product_id == data.product_id
+        ).first():
+            variant_id = None
+
         ownership = Ownership(
             product_id=data.product_id,
-            variant_id=data.variant_id,
+            variant_id=variant_id,
             purchase_date=data.purchase_date,
             purchase_price=data.purchase_price,
             currency=data.currency or "INR",
-            purchase_country=data.purchase_country or "India",
-            ownership_start_date=data.ownership_start_date or data.purchase_date,
-            ownership_end_date=data.ownership_end_date,
-            status=data.status,
-            previous_phone=data.previous_phone,
-            purchase_source=data.purchase_source,
-            owner_session_hash=session_hash
         )
         db.add(ownership)
         db.flush()
@@ -78,7 +80,6 @@ class ExperienceService:
             performance_satisfaction=report_in.performance_satisfaction,
             software_satisfaction=report_in.software_satisfaction,
             camera_satisfaction=report_in.camera_satisfaction,
-            build_satisfaction=report_in.build_satisfaction,
             battery_degradation_perception=report_in.battery_degradation_perception,
             heating_experience=report_in.heating_experience,
             software_update_experience=report_in.software_update_experience,
@@ -86,7 +87,6 @@ class ExperienceService:
             would_buy_again_reason=report_in.would_buy_again_reason,
             biggest_positive=report_in.biggest_positive,
             biggest_problem=report_in.biggest_problem,
-            general_notes=report_in.general_notes,
             trust_status="SELF_REPORTED"
         )
         db.add(report)
@@ -109,12 +109,8 @@ class ExperienceService:
                     experience_report_id=report.id,
                     category_id=category.id,
                     issue_title=issue_in.issue_title,
-                    severity=issue_in.severity,
                     occurred_at_month=issue_in.occurred_at_month or report_in.ownership_duration_months,
-                    resolved=issue_in.resolved,
                     repair_required=issue_in.repair_required,
-                    repair_cost=issue_in.repair_cost,
-                    notes=issue_in.notes
                 )
                 db.add(issue)
 
@@ -125,10 +121,8 @@ class ExperienceService:
                     experience_report_id=report.id,
                     part_replaced=rep_in.part_replaced,
                     official_service_center=rep_in.official_service_center,
-                    covered_under_warranty=rep_in.covered_under_warranty,
                     cost=rep_in.cost,
                     currency=rep_in.currency or "INR",
-                    repair_notes=rep_in.repair_notes
                 )
                 db.add(repair)
 

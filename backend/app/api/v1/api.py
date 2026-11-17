@@ -6,7 +6,8 @@ from app.api.v1.endpoints import (
     experiences,
     insights,
     suggestions,
-    discovery
+    discovery,
+    admin
 )
 
 api_router = APIRouter()
@@ -19,3 +20,4 @@ api_router.include_router(experiences.router, tags=["Experience Reports"])
 api_router.include_router(insights.router, tags=["Product Intelligence"])
 api_router.include_router(suggestions.router, prefix="/product-suggestions", tags=["Product Suggestions"])
 api_router.include_router(discovery.router, prefix="/discovery", tags=["Automated Discovery"])
+api_router.include_router(admin.router, prefix="/admin", tags=["Admin Catalog Management"])

@@ -19,6 +19,13 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: worthit-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
   backend:
     build:
       context: ./backend
@@ -28,12 +35,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       DATABASE_URL: "postgresql://postgres:postgrespassword@postgres:5432/worthit"
       ENVIRONMENT: "production"
       DEBUG: "False"
       TAVILY_API_KEY: "${TAVILY_API_KEY:-}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      REDIS_URL: "redis://redis:6379/0"
+      ADMIN_API_KEY: "${ADMIN_API_KEY:-}"
     ports:
       - "8000:8000"
     command: >

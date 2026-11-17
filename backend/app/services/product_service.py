@@ -149,7 +149,6 @@ class ProductService:
                 official_url=p.official_url,
                 status=p.status,
                 discovery_source=p.discovery_source,
-                verification_status=p.verification_status,
                 description=p.description,
                 created_at=p.created_at,
                 updated_at=p.updated_at,
@@ -198,7 +197,6 @@ class ProductService:
             official_url=product_in.official_url,
             status=product_in.status,
             discovery_source=product_in.discovery_source,
-            verification_status=product_in.verification_status,
             description=product_in.description
         )
         db.add(product)

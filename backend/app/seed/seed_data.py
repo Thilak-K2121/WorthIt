@@ -60,7 +60,6 @@ def seed_database():
         official_url="https://store.google.com/product/pixel_8_pro",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Google's flagship phone powered by the Tensor G3 with 7 years of promised software updates and pro camera controls."
     )
     db.add(pixel)
@@ -81,7 +80,6 @@ def seed_database():
         official_url="https://www.samsung.com/galaxy-s23-ultra",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Flagship powerhouse with Snapdragon 8 Gen 2 for Galaxy, 200MP main sensor, 10x optical periscope, and integrated S-Pen."
     )
     db.add(s23)
@@ -102,7 +100,6 @@ def seed_database():
         official_url="https://www.apple.com/iphone-15-pro",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Grade 5 titanium chassis, A17 Pro 3nm chip, customizable Action Button, and USB-C 3.0 data transfer speeds."
     )
     db.add(iphone)
@@ -123,7 +120,6 @@ def seed_database():
         official_url="https://www.oneplus.com/12",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Equipped with Snapdragon 8 Gen 3, 5400mAh battery, 100W SuperVOOC, and 4th Gen Hasselblad Camera system."
     )
     db.add(op12)
@@ -144,7 +140,6 @@ def seed_database():
         official_url="https://nothing.tech/products/phone-2",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Unique Glyph interface with 33 addressable zones, Snapdragon 8+ Gen 1, and clean Nothing OS 2.5."
     )
     db.add(nothing2)
@@ -165,7 +160,6 @@ def seed_database():
         official_url="https://www.motorola.com/edge-50-ultra",
         status="ACTIVE",
         discovery_source="MANUAL",
-        verification_status="VERIFIED",
         description="Real wood and vegan leather finish, Snapdragon 8s Gen 3, 144Hz pOLED display, and 125W TurboPower charging."
     )
     db.add(moto_edge)
@@ -187,10 +181,6 @@ def seed_database():
             variant_id=v_pixel1.id if i % 2 == 0 else v_pixel2.id,
             purchase_date=p_date,
             purchase_price=Decimal(str(random.choice([99999, 106999, 89999]))),
-            ownership_start_date=p_date,
-            status="CURRENTLY_OWNING",
-            purchase_source=random.choice(["Flipkart", "Official Google Store", "Reliance Digital"]),
-            previous_phone=random.choice(["Pixel 6", "iPhone 11", "OnePlus 9 Pro", "Galaxy S21"])
         )
         db.add(owner)
         db.flush()
@@ -213,7 +203,6 @@ def seed_database():
                 performance_satisfaction=Decimal(str(round(min(5.0, 4.4 + random.uniform(-0.2, 0.4)), 1))),
                 software_satisfaction=Decimal(str(round(min(5.0, 4.8 + random.uniform(-0.2, 0.2)), 1))),
                 camera_satisfaction=Decimal("4.9"),
-                build_satisfaction=Decimal("4.5"),
                 battery_degradation_perception="MODERATE" if d >= 12 else ("MINOR" if d == 6 else "NONE"),
                 heating_experience="NOTICEABLE_WARMTH" if d >= 6 else "NORMAL",
                 software_update_experience="EXCELLENT",
@@ -232,9 +221,7 @@ def seed_database():
                     experience_report_id=r.id,
                     category_id=cat_objs["battery"].id,
                     issue_title="Battery health dropped to ~86% after 1 year of fast charging",
-                    severity="MODERATE",
                     occurred_at_month=11,
-                    resolved=False,
                     repair_required=False
                 )
                 db.add(iss)
@@ -248,10 +235,6 @@ def seed_database():
             variant_id=v_s23_1.id if i % 2 == 0 else v_s23_2.id,
             purchase_date=p_date,
             purchase_price=Decimal(str(random.choice([114999, 124999, 99999]))),
-            ownership_start_date=p_date,
-            status="CURRENTLY_OWNING",
-            purchase_source="Samsung Official Store",
-            previous_phone=random.choice(["Note 20 Ultra", "S21 Ultra", "iPhone 13 Pro"])
         )
         db.add(owner)
         db.flush()
@@ -268,7 +251,6 @@ def seed_database():
                 performance_satisfaction=Decimal(str(round(min(5.0, 4.8 + random.uniform(-0.2, 0.2)), 1))),
                 software_satisfaction=Decimal(str(round(min(5.0, 4.5 + random.uniform(-0.3, 0.3)), 1))),
                 camera_satisfaction=Decimal("4.8"),
-                build_satisfaction=Decimal("4.9"),
                 battery_degradation_perception="MINOR" if d >= 18 else "NONE",
                 heating_experience="COOL",
                 software_update_experience="GOOD",
@@ -287,10 +269,8 @@ def seed_database():
                     experience_report_id=r.id,
                     part_replaced="SCREEN",
                     official_service_center=True,
-                    covered_under_warranty=False,
                     cost=Decimal("18500.00"),
                     currency="INR",
-                    repair_notes="Replaced OLED assembly due to small vertical line after an update."
                 )
                 db.add(rep)
 
@@ -303,10 +283,6 @@ def seed_database():
             variant_id=v_op1.id if i % 2 == 0 else v_op2.id,
             purchase_date=p_date,
             purchase_price=Decimal("64999.00"),
-            ownership_start_date=p_date,
-            status="CURRENTLY_OWNING",
-            purchase_source="Amazon",
-            previous_phone="OnePlus 8T"
         )
         db.add(owner)
         db.flush()
@@ -323,7 +299,6 @@ def seed_database():
                 performance_satisfaction=Decimal("4.9"),
                 software_satisfaction=Decimal("4.2"),
                 camera_satisfaction=Decimal("4.4"),
-                build_satisfaction=Decimal("4.6"),
                 battery_degradation_perception="NONE",
                 heating_experience="COOL",
                 software_update_experience="GOOD",
@@ -341,11 +316,9 @@ def seed_database():
         started_at=datetime.datetime.utcnow() - datetime.timedelta(hours=6),
         completed_at=datetime.datetime.utcnow() - datetime.timedelta(hours=5, minutes=58),
         sources_searched=8,
-        candidates_found=12,
         extracted_count=10,
         duplicates_detected=7,
         new_products_created=3,
-        failed_count=0
     )
     db.add(run)
 

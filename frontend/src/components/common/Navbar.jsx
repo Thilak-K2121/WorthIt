@@ -55,16 +55,6 @@ export default function Navbar() {
               )}
             </Link>
           </nav>
-
-          {/* Top-Right "Sign In" Button matching LexiGuard (links to /products) */}
-          <div className="flex items-center gap-3">
-            <Link
-              to="/products"
-              className="px-5 py-2 rounded-lg bg-[#00D09C] hover:bg-[#00b88a] text-white font-bold text-sm shadow-mint hover:shadow-mint-hover transition-all"
-            >
-              Sign In
-            </Link>
-          </div>
         </div>
       </div>
     </header>

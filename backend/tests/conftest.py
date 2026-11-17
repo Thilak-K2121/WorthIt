@@ -34,7 +34,7 @@ def test_db():
         ("other", "Other / Miscellaneous", "Other")
     ]
     for slug, name, desc in categories:
-        cat = IssueCategory(slug=slug, display_name=name, description=desc)
+        cat = IssueCategory(slug=slug, display_name=name)
         session.add(cat)
     session.commit()
     session.close()
