@@ -330,7 +330,7 @@ Base path: `/api/v1`. Full interactive docs are at `/api/v1/docs`.
 | POST | `/ownerships/{id}/reports` | Add a follow-up review | |
 | POST | `/product-suggestions` | Suggest a missing phone | |
 | POST | `/product-suggestions/{id}/review` | 🔒 Approve (with edits), reject or mark duplicate | |
-| POST | `/discovery/run` | Run the AI discovery pipeline | |
+| POST | `/discovery/run` | 🔒 Run the AI discovery pipeline | |
 | POST | `/admin/products` | 🔒 Add a phone | |
 | PATCH | `/admin/products/{id}` | 🔒 Rename a phone | |
 | DELETE | `/admin/products/{id}` | 🔒 Delete a phone | |

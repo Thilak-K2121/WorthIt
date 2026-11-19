@@ -34,3 +34,14 @@ def test_interrupted_runs_are_failed_on_startup(test_db, monkeypatch):
     assert statuses == ["COMPLETED", "FAILED"]
     assert "restarted" in failed.error_log
     assert failed.completed_at is not None
+
+
+def test_run_discovery_requires_admin_key(client, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "s3cret")
+    body = {"force_mock": True, "max_results": 1}
+    assert client.post("/api/v1/discovery/run", json=body).status_code == 401
+    assert client.post("/api/v1/discovery/run", json=body, headers={"X-Admin-Key": "wrong"}).status_code == 401
+    assert client.post("/api/v1/discovery/run", json=body, headers={"X-Admin-Key": "s3cret"}).status_code == 200
+    # viewing the logs stays public
+    assert client.get("/api/v1/discovery/runs").status_code == 200

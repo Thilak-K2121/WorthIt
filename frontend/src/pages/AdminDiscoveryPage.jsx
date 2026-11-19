@@ -5,7 +5,7 @@ import {
   Smartphone, Inbox, Sparkles, ChevronDown, ChevronUp, ExternalLink, ArrowRight, Layers, Globe,
   Search, Shield, Bot, Database, Activity, Zap, Check, Trash2
 } from 'lucide-react';
-import { api } from '../services/api';
+import { api, getAdminKey } from '../services/api';
 import { parseApiDate } from '../utils/formatters';
 import CatalogManager from '../components/admin/CatalogManager';
 import SuggestionReviewCard from '../components/admin/SuggestionReviewCard';
@@ -166,6 +166,15 @@ export default function AdminDiscoveryPage() {
   }, [running]);
 
   const handleTriggerDiscovery = async () => {
+    // Runs spend Tavily/Gemini quota, so they need the admin key. Check before showing the radar.
+    try {
+      await api.verifyAdminKey(getAdminKey());
+    } catch {
+      alert('Running discovery needs the admin key. Unlock the Catalog Manager tab with your key, then try again.');
+      setActiveTab('catalog');
+      return;
+    }
+
     const jobData = {
       query_topic: queryTopic,
       started_at: Date.now(),

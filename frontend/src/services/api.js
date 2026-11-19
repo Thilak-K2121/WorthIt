@@ -198,12 +198,13 @@ export const api = {
   // ----------------------------------------------------------------------------
 
   /**
-   * Triggers an automated AI web discovery job (Tavily Search + Gemini Extraction).
+   * Triggers an automated AI web discovery job (Tavily Search + Gemini Extraction). Admin key required.
    * @param {object} payload - { query_topic, max_results }
    */
   triggerDiscovery: (payload = {}) =>
     fetchJson('/discovery/run', {
       method: 'POST',
+      headers: adminHeaders(),
       body: JSON.stringify(payload),
     }),
 

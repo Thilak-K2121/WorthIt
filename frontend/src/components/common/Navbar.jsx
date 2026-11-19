@@ -1,29 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { ShieldCheck, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { ShieldCheck } from 'lucide-react';
 
+// The admin console (/admin) is intentionally not linked here; open it by URL.
 export default function Navbar() {
-  const [isDiscoveryActive, setIsDiscoveryActive] = useState(false);
-  const location = useLocation();
-
-  useEffect(() => {
-    const checkActiveJob = () => {
-      let active = false;
-      try {
-        const job = JSON.parse(localStorage.getItem('worthit_active_discovery'));
-        // Same 10-minute cap as the discovery page, so an abandoned job can't keep the badge on
-        active = Boolean(job) && Date.now() - (job.started_at || 0) < 10 * 60 * 1000;
-      } catch {
-        active = false;
-      }
-      setIsDiscoveryActive(active);
-    };
-
-    checkActiveJob();
-    const interval = setInterval(checkActiveJob, 2000);
-    return () => clearInterval(interval);
-  }, [location.pathname]);
-
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -51,15 +31,6 @@ export default function Navbar() {
             </Link>
             <Link to="/suggest" className="hover:text-slate-900 transition-colors">
               Missing Phone?
-            </Link>
-            <Link to="/admin" className="hover:text-slate-900 transition-colors relative flex items-center gap-1.5">
-              <span>Discovery</span>
-              {isDiscoveryActive && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                  Live
-                </span>
-              )}
             </Link>
           </nav>
         </div>

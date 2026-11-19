@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.api.deps import get_db
+from app.api.deps import get_db, require_admin
 from app.core.cache import invalidate_catalog_cache
 from app.schemas.discovery import (
     DiscoveryRunResponse,
@@ -11,11 +11,12 @@ from app.services.discovery_service import DiscoveryService
 
 router = APIRouter()
 
-@router.post("/run", response_model=DiscoveryRunResponse)
+@router.post("/run", response_model=DiscoveryRunResponse, dependencies=[Depends(require_admin)])
 async def trigger_discovery_run(
     request: DiscoveryTriggerRequest,
     db: Session = Depends(get_db)
 ):
+    """Admin-only: runs the Tavily + Gemini pipeline (spends API quota)."""
     run = await DiscoveryService.run_discovery(
         db=db,
         query_topic=request.query_topic or "latest smartphone launch 2026",

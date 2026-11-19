@@ -39,7 +39,6 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm text-slate-600">
               <li><Link to="/about" className="hover:text-[#00D09C] transition-colors">Trust Model & Sample Sizes</Link></li>
-              <li><Link to="/admin" className="hover:text-[#00D09C] transition-colors">Automated Discovery Logs</Link></li>
               <li><a href="https://worthit-backend-v4ob.onrender.com/api/v1/docs" target="_blank" rel="noreferrer" className="hover:text-[#00D09C] transition-colors">REST API Docs</a></li>
             </ul>
           </div>
