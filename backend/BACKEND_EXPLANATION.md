@@ -272,21 +272,26 @@ This is the **business logic layer** (the "brains"). When an API endpoint receiv
 
 ### 📄 `app/services/ownership_service.py`
 * **What is it?**  
-  Manages phone ownership records and experience reviews submitted by users.
-* **Contains Two Service Classes:**
-  #### 1. `OwnershipService`:
+  Manages phone ownership records (one person + one phone + variant + price paid). Used by the "Share Experience" page.
+* **`OwnershipService`:**
   * `get_by_id(db, ownership_id)`: Fetches an ownership record with all linked reviews, issues, and repair bills.
   * `list_by_product(db, product_id, skip, limit)`: Returns all ownership records for a specific smartphone.
-  * `create_ownership(db, data, session_hash)`: Saves that a user purchased a phone. If they also included a review in the same submission, it automatically calls `ExperienceService` to save that too.
-  #### 2. `ExperienceService`:
+  * `create_ownership(db, data)`: Saves that a user purchased a phone. If they also included a review in the same submission, it automatically calls `ExperienceService` to save that too.
+
+---
+
+### 📄 `app/services/experience_service.py`
+* **What is it?**  
+  Owner reviews (experience reports) over time. Used by the "Share Experience" page (writing) and the phone detail page (reading).
+* **`ExperienceService`:**
   * `add_experience_report(db, ownership_id, report_in)`: Saves a new review milestone (e.g. 6-month review), records any hardware issues (with their severity), and records any repair receipts.
   * `list_reports_for_product(db, product_id, min_duration_months, max_duration_months, skip, limit)`: Returns reviews for a phone, with optional filtering (e.g. "show only 12+ month reviews").
 
 ---
 
-### 📄 `app/services/intelligence_service.py`
+### 📄 `app/services/insights_service.py`
 * **What is it?**  
-  The mathematical engine that turns hundreds of raw reviews into clean, actionable statistics, charts, and comparisons.
+  The mathematical engine that turns hundreds of raw reviews for ONE phone into clean, actionable statistics. Feeds the insights section of the phone detail page.
 * **Key Functions:**
   1. `get_sample_confidence(sample_size, long_term_size)`:
      * **What it does:** Evaluates how much we can trust the ratings. If a phone only has 1 review, it marks it as `VERY_LOW` confidence. If it has 100+ owners with 20+ long-term owners, it marks it as `HIGH` statistical confidence.
@@ -299,9 +304,16 @@ This is the **business logic layer** (the "brains"). When an API endpoint receiv
        * Issue category breakdown (e.g. 15% had display issues, 8% had battery drain).
        * Median repair cost in INR.
        * Timeline progression buckets (1-3m, 4-6m, 7-12m, 13-18m, 19-24m+).
-  3. `compare_products(db, product_a_id, product_b_id)`:
+
+---
+
+### 📄 `app/services/compare_service.py`
+* **What is it?**  
+  Side-by-side comparison of TWO phones for the Compare page. Reuses `InsightsService` for each phone.
+* **Key Functions:**
+  1. `compare_products(db, product_a_id, product_b_id)`:
      * **What it does:** Fetches insights for two phones side-by-side, compares their satisfaction, battery life, repurchase intent, and repair rates, and writes dynamic key takeaway bullet points (e.g. *"Phone A leads in long-term battery satisfaction (4.8 vs 4.1)"*).
-  4. `_build_comparison_item(db, product_id)`:
+  2. `_build_comparison_item(db, product_id)`:
      * **What it does:** Helper function that packages a single phone's intelligence data into a standard comparison card.
 
 ---

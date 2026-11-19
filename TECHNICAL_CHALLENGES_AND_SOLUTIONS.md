@@ -90,7 +90,7 @@ INFO: 127.0.0.1 - "GET /api/v1/compare?..." 500 Internal Server Error
 
 #### 💡 The Engineering Solution
 1. Changed the type definition in `insights.py` to `common_parts: List[Dict[str, Any]] = []` to accommodate polymorphic dictionary entries.
-2. Verified the aggregation logic in `IntelligenceService.compare_products` to handle edge cases where products have zero registered reviews or no repair records.
+2. Verified the aggregation logic in `CompareService.compare_products` to handle edge cases where products have zero registered reviews or no repair records.
 
 ---
 

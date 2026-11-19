@@ -92,7 +92,7 @@ flowchart TD
         
         subgraph Services["Core Business Logic & Domain Services"]
             ProdService[ProductService - Bulk Aggregations]
-            IntelService[IntelligenceService - Sample Sizing & Scores]
+            IntelService[InsightsService - Sample Sizing & Scores]
             OwnService[OwnershipService - Review Intake]
             DiscService[DiscoveryService - Search & Scrape Orchestration]
             DedupService[DeduplicationService - Token Jaccard Matching]
@@ -357,7 +357,8 @@ backend/
     ├── services/                          # Core Domain Business Logic
     │   ├── product_service.py             # Bulk catalog queries & creation
     │   ├── ownership_service.py           # Ownership intake & report registration
-    │   ├── intelligence_service.py        # Scoring metrics & comparison logic
+    │   ├── insights_service.py            # Scoring metrics & sample confidence (one phone)
+    │   ├── compare_service.py             # Side-by-side comparison (two phones)
     │   ├── deduplication_service.py       # Brand alias & Jaccard token matching
     │   ├── discovery_service.py           # Discovery orchestration & pipeline
     │   └── suggestion_service.py          # Suggestion approvals & intake
@@ -397,7 +398,7 @@ backend/
 - **Responsibility:** High-performance catalog queries, search filtering, and product creation.
 - **Key Function:** `list_products(db, search, brand, status, skip, limit, sort_by)`: Uses bulk SQL queries with `joinedload(Product.variants)` to compute multi-metric ownership stats across 50 devices in **40ms**, completely eliminating the N+1 query problem.
 
-### `backend/app/services/intelligence_service.py`
+### `backend/app/services/insights_service.py`
 - **Responsibility:** Computes statistical confidence tiers, longitudinal curves, repair matrices, and side-by-side product comparisons.
 - **Key Function:** `compute_product_insights(db, product_id)`: Aggregates overall satisfaction, battery degradation ratings, recurring hardware defects, and verified repurchase percentages.
 - **Key Function:** `compare_products(db, product_ids)`: Generates a normalized comparison payload comparing two or more devices across all longitudinal metrics.
@@ -570,7 +571,7 @@ ProductListPage Renders Matching ProductCards with Staggered Animations
 ```text
 1. User navigates to /compare and selects Phone A and Phone B
 2. Frontend calls api.compareProducts([phoneA_id, phoneB_id])
-3. Backend IntelligenceService.compare_products() fetches both devices
+3. Backend CompareService.compare_products() fetches both devices
 4. Computes comparative metrics:
    - 12m+ Sample Size & Statistical Confidence Tier
    - Overall, Battery, Camera, Software Satisfaction Averages
@@ -606,8 +607,8 @@ ProductListPage Renders Matching ProductCards with Staggered Animations
 | Function | File Location | Layer | Core Responsibility |
 | :--- | :--- | :--- | :--- |
 | `list_products()` | `services/product_service.py` | Service | Bulk-aggregates metrics across devices in 40ms without N+1 queries. |
-| `compute_product_insights()`| `services/intelligence_service.py`| Service | Computes sample confidence and longitudinal battery/software scores. |
-| `compare_products()` | `services/intelligence_service.py`| Service | Assembles side-by-side comparative matrices for 2+ devices. |
+| `compute_product_insights()`| `services/insights_service.py`| Service | Computes sample confidence and longitudinal battery/software scores. |
+| `compare_products()` | `services/compare_service.py`| Service | Assembles side-by-side comparative matrices for 2+ devices. |
 | `register_ownership()` | `services/ownership_service.py` | Service | Registers verified device ownership and initial experience report. |
 | `find_existing_duplicate()`| `services/deduplication_service.py`| Service | Prevents duplicate phone entries via Token Jaccard matching. |
 | `run_discovery()` | `services/discovery_service.py` | Service | Orchestrates Tavily search, Gemini extraction, and catalog persistence. |
@@ -624,7 +625,7 @@ ProductListPage Renders Matching ProductCards with Staggered Animations
 | `backend/app/main.py` | Entrypoint | Manages FastAPI lifespan, startup table creation, CORS, and auto-seeding. |
 | `backend/app/core/database.py` | Database Engine | Configures SQLAlchemy connection pooling and PostgreSQL pooler normalization. |
 | `backend/app/services/product_service.py` | Domain Service | Contains optimized bulk SQL aggregation logic yielding ~1,500x speedup. |
-| `backend/app/services/intelligence_service.py`| Analytics Service| Encapsulates statistical confidence algorithms and comparative evaluation. |
+| `backend/app/services/insights_service.py`| Analytics Service| Encapsulates statistical confidence algorithms and comparative evaluation. |
 | `backend/app/services/discovery_service.py` | AI Service | Pipeline coordinating Tavily search, Gemini extraction, and deduplication. |
 | `frontend/src/pages/ProductListPage.jsx` | Frontend Page | 17-brand directory, buffered search bar, and device grid with stagger animations. |
 | `frontend/src/pages/ComparePage.jsx` | Frontend Page | Side-by-side longitudinal comparison matrix with visual score indicators. |
@@ -668,7 +669,7 @@ ProductListPage Renders Matching ProductCards with Staggered Animations
 
 - **If they open `backend/app/services/product_service.py`:**
   - *Point out lines 48–85:* Explain the **2 bulk SQL aggregate queries** with `joinedload` that solved the N+1 problem.
-- **If they open `backend/app/services/intelligence_service.py`:**
+- **If they open `backend/app/services/insights_service.py`:**
   - *Point out `get_sample_confidence()`:* Explain how sample size volume and 12m+ duration weighting prevent premature 5-star ratings.
 - **If they open `backend/app/services/deduplication_service.py`:**
   - *Point out `find_existing_duplicate()`:* Explain brand canonicalization, regex noise stripping, and Jaccard token set intersection.
@@ -685,7 +686,7 @@ ProductListPage Renders Matching ProductCards with Staggered Animations
 | :--- | :--- | :--- | :--- | :--- |
 | **Provider Pattern for AI & Search** | `backend/app/providers/` | Decouples core logic from third-party vendor APIs, enabling zero-cost unit testing. | Direct SDK calls inside route handlers | Requires abstract interface boilerplate, but ensures 100% CI/CD evaluability. |
 | **Bulk SQL `GROUP BY` Aggregations** | `backend/app/services/product_service.py` | Drastically reduces remote database network round-trips over cloud connection poolers. | Per-device database queries or in-memory Python loops | Slightly more complex SQL expressions, but yields 1,500x latency reduction. |
-| **Adaptive Sample Confidence Tiers** | `backend/app/services/intelligence_service.py` | Eliminates unboxing review bias by contextualizing ratings with longitudinal sample volume. | Unweighted arithmetic star averages | Shows 'Early Data' labels on newer models, but protects consumers from skewed data. |
+| **Adaptive Sample Confidence Tiers** | `backend/app/services/insights_service.py` | Eliminates unboxing review bias by contextualizing ratings with longitudinal sample volume. | Unweighted arithmetic star averages | Shows 'Early Data' labels on newer models, but protects consumers from skewed data. |
 | **Buffered Search Input State** | `frontend/src/pages/ProductListPage.jsx` | Prevents input focus loss and excessive API triggering on single keystrokes. | Immediate `onChange` URL parameter mutation | Requires pressing Enter or clicking Search, but delivers a seamless typing experience. |
 
 ---

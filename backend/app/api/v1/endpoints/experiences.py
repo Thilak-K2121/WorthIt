@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.cache import cache, cached_json_response, params_hash
 from app.schemas.experience import ExperienceReportResponse
-from app.services.ownership_service import ExperienceService
+from app.services.experience_service import ExperienceService
 
 router = APIRouter()
 

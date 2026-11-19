@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.cache import cache, cached_json_response
 from app.schemas.insights import ProductInsightsResponse
-from app.services.intelligence_service import IntelligenceService
+from app.services.insights_service import InsightsService
 
 router = APIRouter()
 
@@ -14,7 +14,7 @@ def get_product_insights(
     db: Session = Depends(get_db)
 ):
     def compute():
-        insights = IntelligenceService.compute_product_insights(db, product_id)
+        insights = InsightsService.compute_product_insights(db, product_id)
         if not insights:
             raise HTTPException(status_code=404, detail="Product not found or has no insights available")
         return insights

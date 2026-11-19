@@ -5,7 +5,8 @@ from app.api.deps import get_db
 from app.core.cache import invalidate_catalog_cache
 from app.schemas.ownership import OwnershipCreate, OwnershipResponse
 from app.schemas.experience import ExperienceReportCreate, ExperienceReportResponse
-from app.services.ownership_service import OwnershipService, ExperienceService
+from app.services.ownership_service import OwnershipService
+from app.services.experience_service import ExperienceService
 
 router = APIRouter()
 
