@@ -53,6 +53,29 @@ def seed_initial_issue_categories():
     finally:
         db.close()
 
+def fail_interrupted_discovery_runs():
+    """
+    The backend runs a single worker, so any discovery run still RUNNING at startup
+    was killed by a restart/redeploy and will never finish. Mark it FAILED so the
+    admin console stops waiting on it.
+    """
+    import datetime
+    from app.models.discovery import ProductDiscoveryRun
+    db = SessionLocal()
+    try:
+        stuck = db.query(ProductDiscoveryRun).filter(ProductDiscoveryRun.status == "RUNNING").all()
+        for run in stuck:
+            run.status = "FAILED"
+            run.completed_at = datetime.datetime.utcnow()
+            run.error_log = "Interrupted: the server restarted before this run finished."
+        if stuck:
+            db.commit()
+            logger.warning(f"Marked {len(stuck)} interrupted discovery run(s) as FAILED")
+    except Exception as e:
+        logger.error(f"Could not clean up interrupted discovery runs: {e}")
+    finally:
+        db.close()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -73,6 +96,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Retired-column cleanup failed (inserts may fail until fixed): {e}")
     seed_initial_issue_categories()
+    fail_interrupted_discovery_runs()
     try:
         from app.seed.seed_famous_smartphones import seed_famous_smartphones
         seed_famous_smartphones()

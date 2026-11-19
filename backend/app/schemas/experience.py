@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common import UTCDateTime
 
 # Issue Schemas
 class IssueCategoryResponse(BaseModel):
@@ -23,7 +24,7 @@ class ReportedIssueResponse(BaseModel):
     issue_title: str
     occurred_at_month: Optional[int]
     repair_required: bool
-    created_at: datetime
+    created_at: UTCDateTime
     category: Optional[IssueCategoryResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,7 +42,7 @@ class RepairRecordResponse(BaseModel):
     official_service_center: bool
     cost: Decimal
     currency: str
-    created_at: datetime
+    created_at: UTCDateTime
     model_config = ConfigDict(from_attributes=True)
 
 # Experience Report Schemas
@@ -86,7 +87,7 @@ class ExperienceReportResponse(BaseModel):
     biggest_positive: Optional[str]
     biggest_problem: Optional[str]
     trust_status: str
-    created_at: datetime
+    created_at: UTCDateTime
     issues: List[ReportedIssueResponse] = []
     repairs: List[RepairRecordResponse] = []
     model_config = ConfigDict(from_attributes=True)

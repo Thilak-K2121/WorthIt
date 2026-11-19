@@ -6,8 +6,26 @@ import {
   Search, Shield, Bot, Database, Activity, Zap, Check, Trash2
 } from 'lucide-react';
 import { api } from '../services/api';
+import { parseApiDate } from '../utils/formatters';
 import CatalogManager from '../components/admin/CatalogManager';
 import SuggestionReviewCard from '../components/admin/SuggestionReviewCard';
+
+const ACTIVE_JOB_KEY = 'worthit_active_discovery';
+// A run normally takes 1-3 minutes; past this we stop waiting (the server may have restarted).
+const MAX_WAIT_MS = 10 * 60 * 1000;
+
+/**
+ * Is the job we started finished? Compares run IDs, not clocks: our run is the
+ * newest run whose ID differs from the newest run that existed before we clicked.
+ */
+function findFinishedRun(job, runs) {
+  const latest = runs[0];
+  if (!latest) return null;
+  const isOurs = 'previous_run_id' in job
+    ? latest.id !== job.previous_run_id
+    : parseApiDate(latest.started_at).getTime() >= job.started_at - 10000; // jobs saved before this fix
+  return isOurs && (latest.status === 'COMPLETED' || latest.status === 'FAILED') ? latest : null;
+}
 
 const DISCOVERY_STAGES = [
   {
@@ -83,7 +101,7 @@ export default function AdminDiscoveryPage() {
   };
 
   useEffect(() => {
-    const activeStored = localStorage.getItem('worthit_active_discovery');
+    const activeStored = localStorage.getItem(ACTIVE_JOB_KEY);
     if (activeStored) {
       try {
         const parsed = JSON.parse(activeStored);
@@ -93,7 +111,7 @@ export default function AdminDiscoveryPage() {
         setActiveJobQuery(parsed.query_topic || 'Latest Smartphone Launches');
         setRunning(true);
       } catch (e) {
-        localStorage.removeItem('worthit_active_discovery');
+        localStorage.removeItem(ACTIVE_JOB_KEY);
       }
     }
     refreshData();
@@ -102,23 +120,38 @@ export default function AdminDiscoveryPage() {
   useEffect(() => {
     if (running) {
       elapsedTimerRef.current = setInterval(() => {
+        try {
+          const job = JSON.parse(localStorage.getItem(ACTIVE_JOB_KEY));
+          if (job?.started_at) {
+            setElapsedSeconds(Math.max(0, Math.floor((Date.now() - job.started_at) / 1000)));
+            return;
+          }
+        } catch { /* fall through */ }
         setElapsedSeconds(prev => prev + 1);
       }, 1000);
 
       pollingTimerRef.current = setInterval(async () => {
         const freshRuns = await refreshData();
-        const activeStored = localStorage.getItem('worthit_active_discovery');
-        if (activeStored) {
-          const parsed = JSON.parse(activeStored);
-          const latestRun = freshRuns[0];
-          if (latestRun && new Date(latestRun.started_at).getTime() >= (parsed.started_at - 10000)) {
-            if (latestRun.status === 'COMPLETED' || latestRun.status === 'FAILED') {
-              localStorage.removeItem('worthit_active_discovery');
-              setRunning(false);
-              setExpandedRunId(latestRun.id);
-              setActiveTab('runs');
-            }
-          }
+        let job;
+        try {
+          job = JSON.parse(localStorage.getItem(ACTIVE_JOB_KEY));
+        } catch {
+          job = null;
+        }
+        if (!job) {
+          setRunning(false); // cleared elsewhere (e.g. the request finished in another tab)
+          return;
+        }
+        const finished = findFinishedRun(job, freshRuns);
+        if (finished) {
+          localStorage.removeItem(ACTIVE_JOB_KEY);
+          setRunning(false);
+          setExpandedRunId(finished.id);
+          setActiveTab('runs');
+        } else if (Date.now() - job.started_at > MAX_WAIT_MS) {
+          localStorage.removeItem(ACTIVE_JOB_KEY);
+          setRunning(false);
+          alert('Discovery is taking much longer than usual, so the page stopped waiting. Check the pipeline logs; the server may have restarted during the run.');
         }
       }, 3500);
     } else {
@@ -135,9 +168,10 @@ export default function AdminDiscoveryPage() {
   const handleTriggerDiscovery = async () => {
     const jobData = {
       query_topic: queryTopic,
-      started_at: Date.now()
+      started_at: Date.now(),
+      previous_run_id: runs[0]?.id ?? null
     };
-    localStorage.setItem('worthit_active_discovery', JSON.stringify(jobData));
+    localStorage.setItem(ACTIVE_JOB_KEY, JSON.stringify(jobData));
     setActiveJobQuery(queryTopic);
     setElapsedSeconds(0);
     setRunning(true);
@@ -147,7 +181,7 @@ export default function AdminDiscoveryPage() {
         query_topic: queryTopic,
         max_results: 5
       });
-      localStorage.removeItem('worthit_active_discovery');
+      localStorage.removeItem(ACTIVE_JOB_KEY);
       setRunning(false);
       await refreshData();
       if (newRun?.id) {
@@ -155,9 +189,15 @@ export default function AdminDiscoveryPage() {
         setActiveTab('runs');
       }
     } catch (err) {
-      localStorage.removeItem('worthit_active_discovery');
-      setRunning(false);
-      alert(`Discovery run failed: ${err.message}`);
+      // The connection can drop while the server keeps working on the run.
+      // If a new run exists server-side, keep the radar up and let polling finish it.
+      const freshRuns = await refreshData();
+      const serverHasOurRun = freshRuns[0] && freshRuns[0].id !== jobData.previous_run_id;
+      if (!serverHasOurRun) {
+        localStorage.removeItem(ACTIVE_JOB_KEY);
+        setRunning(false);
+        alert(`Discovery run failed: ${err.message}`);
+      }
     }
   };
 
@@ -465,7 +505,7 @@ export default function AdminDiscoveryPage() {
 
                         <div className="text-xs text-slate-500 flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{new Date(r.started_at).toLocaleString()}</span>
+                          <span>{parseApiDate(r.started_at).toLocaleString()}</span>
                         </div>
                       </div>
 

@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common import UTCDateTime
 from app.schemas.product import ProductVariantResponse
 from app.schemas.experience import ExperienceReportResponse, ExperienceReportCreate
 
@@ -22,7 +23,7 @@ class OwnershipResponse(BaseModel):
     purchase_date: date
     purchase_price: Optional[Decimal]
     currency: Optional[str]
-    created_at: datetime
+    created_at: UTCDateTime
     variant: Optional[ProductVariantResponse] = None
     reports: List[ExperienceReportResponse] = []
     model_config = ConfigDict(from_attributes=True)

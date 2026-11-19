@@ -8,8 +8,15 @@ export default function Navbar() {
 
   useEffect(() => {
     const checkActiveJob = () => {
-      const active = localStorage.getItem('worthit_active_discovery');
-      setIsDiscoveryActive(Boolean(active));
+      let active = false;
+      try {
+        const job = JSON.parse(localStorage.getItem('worthit_active_discovery'));
+        // Same 10-minute cap as the discovery page, so an abandoned job can't keep the badge on
+        active = Boolean(job) && Date.now() - (job.started_at || 0) < 10 * 60 * 1000;
+      } catch {
+        active = false;
+      }
+      setIsDiscoveryActive(active);
     };
 
     checkActiveJob();

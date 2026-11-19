@@ -54,6 +54,24 @@
 
   <!-- ===================================================================== -->
   <section>
+    <h2>2026-11-19 · Fix: discovery timer never stopping</h2>
+    <div class="meta"><span class="tag fix">Fixed</span></div>
+    <ul>
+      <li><strong>Symptom:</strong> the Live AI Discovery radar kept counting past 300 s, and the navbar "Live" badge stayed on, although the run had finished on the server in about 2 minutes.</li>
+      <li><strong>Root cause:</strong> the API sent UTC timestamps without a timezone marker (<code>2026-11-19T17:12:54</code>). Browsers read them as <em>local</em> time, 5 h 30 m early in India.
+        The page's "has my run finished?" check compared that time with the click time, so it could never pass. It only ever worked when the user stayed on the page until the request returned.
+        The same bug showed run times 5 h 30 m off in the logs.</li>
+      <li><strong>Fix (backend):</strong> every API datetime is now serialized as explicit UTC (<code>...Z</code>) through a shared <code>UTCDateTime</code> type (14 fields).
+        On startup, runs left <code>RUNNING</code> by a restart or redeploy are marked <code>FAILED</code> with a reason, so nothing waits on them forever.</li>
+      <li><strong>Fix (frontend):</strong> completion is now detected by run ID (a new run appears with status COMPLETED or FAILED), with no clock comparison.
+        Elapsed time is computed from the start timestamp. The page stops waiting after 10 minutes, and keeps waiting if only the browser's connection dropped while the server kept working.
+        A timezone-safe <code>parseApiDate</code> helper is used for display.</li>
+      <li>2 new tests. Full suite: <strong>43 passed</strong>.</li>
+    </ul>
+  </section>
+
+  <!-- ===================================================================== -->
+  <section>
     <h2>2026-11-17 (update 2) · Admin can edit phone names; deploy fix</h2>
     <div class="meta">
       <span class="tag add">Added</span><span class="tag fix">Fixed</span>

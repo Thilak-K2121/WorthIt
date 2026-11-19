@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common import UTCDateTime
 
 class ProductVariantBase(BaseModel):
     ram: Optional[str] = Field(None, example="12GB")
@@ -16,7 +17,7 @@ class ProductVariantCreate(ProductVariantBase):
 class ProductVariantResponse(ProductVariantBase):
     id: str
     product_id: str
-    created_at: datetime
+    created_at: UTCDateTime
     model_config = ConfigDict(from_attributes=True)
 
 class ProductBase(BaseModel):
@@ -50,14 +51,14 @@ class ProductSourceResponse(BaseModel):
     id: str
     source_url: str
     provider: str
-    discovered_at: datetime
+    discovered_at: UTCDateTime
     model_config = ConfigDict(from_attributes=True)
 
 class ProductSummaryResponse(ProductBase):
     id: str
     normalized_name: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
     variant_count: int = 0
     total_owners_count: int = 0
     long_term_owners_count: int = 0 # 12+ months
@@ -68,8 +69,8 @@ class ProductSummaryResponse(ProductBase):
 class ProductDetailResponse(ProductBase):
     id: str
     normalized_name: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
     variants: List[ProductVariantResponse] = []
     sources: List[ProductSourceResponse] = []
     total_owners_count: int = 0

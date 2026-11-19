@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common import UTCDateTime
 
 class ExtractedVariant(BaseModel):
     ram: Optional[str] = None
@@ -37,13 +38,13 @@ class ProductSourceSummaryResponse(BaseModel):
     source_url: str
     provider: str = "TAVILY"
     raw_extracted_json: Optional[Dict[str, Any]] = None
-    discovered_at: datetime
+    discovered_at: UTCDateTime
     model_config = ConfigDict(from_attributes=True)
 
 class DiscoveryRunResponse(BaseModel):
     id: str
-    started_at: datetime
-    completed_at: Optional[datetime] = None
+    started_at: UTCDateTime
+    completed_at: Optional[UTCDateTime] = None
     status: str
     sources_searched: int
     extracted_count: int

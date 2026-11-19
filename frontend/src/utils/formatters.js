@@ -48,3 +48,15 @@ export function getScoreColor(score) {
   if (score >= 3.0) return 'text-amber-600';
   return 'text-rose-600';
 }
+
+/**
+ * Parses an API timestamp as UTC. Timestamps without an offset (older API responses)
+ * would otherwise be read as the viewer's local time.
+ */
+export function parseApiDate(value) {
+  if (!value) return new Date(NaN);
+  const s = String(value);
+  const hasZone = /([zZ]|[+-]\d{2}:?\d{2})$/.test(s);
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(s);
+  return new Date(hasZone || isDateOnly ? s : `${s}Z`);
+}

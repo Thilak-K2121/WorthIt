@@ -1,6 +1,7 @@
 from typing import Optional
 from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.common import UTCDateTime
 
 class ProductSuggestionCreate(BaseModel):
     brand: str = Field(..., example="Nothing")
@@ -27,5 +28,5 @@ class ProductSuggestionResponse(BaseModel):
     notes: Optional[str]
     status: str
     target_product_id: Optional[str]
-    created_at: datetime
+    created_at: UTCDateTime
     model_config = ConfigDict(from_attributes=True)
